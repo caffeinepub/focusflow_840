@@ -29,7 +29,7 @@ const TRACKS: Track[] = [
     id: 1,
     name: "Lofi Beats",
     subtitle: "Chill & Creative",
-    url: "https://www.bensound.com/bensound-music/bensound-creativeminds.mp3",
+    url: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
     color: "from-violet-900/40 via-indigo-900/30 to-transparent",
     accentColor: "oklch(0.65 0.22 290)",
     accentOklch: "0.65 0.22 290",
@@ -39,7 +39,7 @@ const TRACKS: Track[] = [
     id: 2,
     name: "Rain Sounds",
     subtitle: "Nature & Calm",
-    url: "https://www.soundjay.com/nature/sounds/rain-03.mp3",
+    url: "https://cdn.pixabay.com/audio/2022/03/10/audio_270f49e2df.mp3",
     color: "from-cyan-900/40 via-blue-900/30 to-transparent",
     accentColor: "oklch(0.7 0.15 210)",
     accentOklch: "0.7 0.15 210",
@@ -49,7 +49,7 @@ const TRACKS: Track[] = [
     id: 3,
     name: "Nature Vibes",
     subtitle: "Relaxing & Fresh",
-    url: "https://www.bensound.com/bensound-music/bensound-relaxing.mp3",
+    url: "https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1c12.mp3",
     color: "from-emerald-900/40 via-teal-900/30 to-transparent",
     accentColor: "oklch(0.7 0.18 155)",
     accentOklch: "0.7 0.18 155",
@@ -59,7 +59,7 @@ const TRACKS: Track[] = [
     id: 4,
     name: "Deep Focus",
     subtitle: "Concentration Mode",
-    url: "https://www.bensound.com/bensound-music/bensound-study.mp3",
+    url: "https://cdn.pixabay.com/audio/2024/02/28/audio_736439f96a.mp3",
     color: "from-purple-900/40 via-indigo-900/30 to-transparent",
     accentColor: "oklch(0.62 0.24 270)",
     accentOklch: "0.62 0.24 270",
@@ -69,7 +69,7 @@ const TRACKS: Track[] = [
     id: 5,
     name: "White Noise",
     subtitle: "Block Distractions",
-    url: "https://www.soundjay.com/nature/sounds/wind-howling-01.mp3",
+    url: "https://cdn.pixabay.com/audio/2022/03/24/audio_9b1e1a3b82.mp3",
     color: "from-slate-800/40 via-slate-900/30 to-transparent",
     accentColor: "oklch(0.6 0.04 265)",
     accentOklch: "0.6 0.04 265",
@@ -102,13 +102,18 @@ export function MusicPlayer() {
       audioRef.current = new Audio();
     }
     const audio = audioRef.current;
+    audio.crossOrigin = "anonymous";
     audio.src = currentTrack.url;
     audio.volume = (isMutedRef.current ? 0 : volumeRef.current) / 100;
     audio.loop = isLoopingRef.current;
+    audio.load();
     if (isPlayingRef.current) {
-      void audio.play().catch(() => {
-        setIsPlaying(false);
-      });
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          setIsPlaying(false);
+        });
+      }
     }
     return () => {
       audio.pause();
@@ -129,25 +134,38 @@ export function MusicPlayer() {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      void audioRef.current.play().catch(() => setIsPlaying(false));
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch(() => setIsPlaying(false));
+      } else {
+        setIsPlaying(true);
+      }
     }
-    setIsPlaying((prev) => !prev);
   }
 
   function selectTrack(track: Track) {
     const wasPlaying = isPlaying;
-    setIsPlaying(false);
     if (audioRef.current) audioRef.current.pause();
+    setIsPlaying(false);
     setCurrentTrack(track);
     if (wasPlaying) {
       setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.src = track.url;
-          void audioRef.current.play().catch(() => {});
-          setIsPlaying(true);
+          audioRef.current.crossOrigin = "anonymous";
+          audioRef.current.load();
+          const p = audioRef.current.play();
+          if (p !== undefined) {
+            p.then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+          } else {
+            setIsPlaying(true);
+          }
         }
-      }, 50);
+      }, 100);
     }
   }
 
