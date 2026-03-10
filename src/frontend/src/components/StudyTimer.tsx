@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTimer } from "@/contexts/TimerContext";
 import {
   CheckCircle,
   Clock,
-  Droplets,
   History,
   Pause,
   Play,
@@ -13,10 +13,6 @@ import {
   Trophy,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { useCompleteStudySession } from "../hooks/useQueries";
-import { useSessionHistory } from "../hooks/useSessionHistory";
 
 // Animated digit — flips up/down when value changes
 function AnimatedDigit({
@@ -55,8 +51,6 @@ function AnimatedDigit({
     </span>
   );
 }
-
-const WATER_INTERVAL_MS = 30 * 60 * 1000;
 
 // Orbiting particle dot
 function OrbitParticle({
@@ -115,112 +109,26 @@ function OrbitParticle({
 }
 
 export function StudyTimer() {
-  const [totalSeconds, setTotalSeconds] = useState(25 * 60);
-  const [remaining, setRemaining] = useState(25 * 60);
-  const [running, setRunning] = useState(false);
-  const [completePulse, setCompletePulse] = useState(false);
-  const { sessions, addSession, clearSessions } = useSessionHistory();
+  const {
+    totalSeconds,
+    remaining,
+    running,
+    completePulse,
+    customHours,
+    customMinutes,
+    customSeconds,
+    setCustomHours,
+    setCustomMinutes,
+    setCustomSeconds,
+    handleStart,
+    handleReset,
+    handleCustomTime,
+    applyPreset,
+    sessions,
+    clearSessions,
+  } = useTimer();
+
   const completed = sessions.length;
-  const [customHours, setCustomHours] = useState("0");
-  const [customMinutes, setCustomMinutes] = useState("25");
-  const [customSeconds, setCustomSeconds] = useState("0");
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const waterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sessionStartRef = useRef<number | null>(null);
-
-  const { mutate: completeSession } = useCompleteStudySession();
-
-  const clearTimers = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (waterTimerRef.current) clearInterval(waterTimerRef.current);
-    intervalRef.current = null;
-    waterTimerRef.current = null;
-  }, []);
-
-  const handleComplete = useCallback(() => {
-    clearTimers();
-    setRunning(false);
-    setRemaining(0);
-    const duration = Math.round(totalSeconds / 60);
-    completeSession(BigInt(duration));
-    addSession(duration);
-    setCompletePulse(true);
-    setTimeout(() => setCompletePulse(false), 2000);
-    toast.success("Session Complete! 🎉", {
-      description: `You focused for ${duration} minutes. Amazing work!`,
-      duration: 5000,
-    });
-  }, [clearTimers, completeSession, totalSeconds, addSession]);
-
-  useEffect(() => {
-    if (!running) return;
-    intervalRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          handleComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [running, handleComplete]);
-
-  function startWaterReminder() {
-    waterTimerRef.current = setInterval(() => {
-      toast("💧 Hydration Reminder!", {
-        description:
-          "You've been studying for 30 minutes. Time to drink some water!",
-        duration: 8000,
-        icon: <Droplets className="w-4 h-4 text-cyan-400" />,
-      });
-    }, WATER_INTERVAL_MS);
-  }
-
-  function handleStart() {
-    if (!running) {
-      if (remaining === 0) {
-        setRemaining(totalSeconds);
-      }
-      sessionStartRef.current = Date.now();
-      startWaterReminder();
-    } else {
-      if (waterTimerRef.current) clearInterval(waterTimerRef.current);
-    }
-    setRunning((prev) => !prev);
-  }
-
-  function handleReset() {
-    clearTimers();
-    setRunning(false);
-    setRemaining(totalSeconds);
-    sessionStartRef.current = null;
-  }
-
-  function handleCustomTime() {
-    const hrs = Math.max(0, Number.parseInt(customHours, 10) || 0);
-    const mins = Math.max(0, Number.parseInt(customMinutes, 10) || 0);
-    const secs = Math.max(0, Number.parseInt(customSeconds, 10) || 0);
-    const total = hrs * 3600 + mins * 60 + secs;
-    if (total < 1 || total > 12 * 3600) return;
-    setTotalSeconds(total);
-    setRemaining(total);
-    setRunning(false);
-    clearTimers();
-  }
-
-  function applyPreset(min: number) {
-    setCustomHours("0");
-    setCustomMinutes(String(min));
-    setCustomSeconds("0");
-    const secs = min * 60;
-    setTotalSeconds(secs);
-    setRemaining(secs);
-    setRunning(false);
-    clearTimers();
-  }
 
   const pct =
     totalSeconds > 0 ? ((totalSeconds - remaining) / totalSeconds) * 100 : 0;

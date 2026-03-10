@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { TRACKS, useMusic } from "@/contexts/MusicContext";
 import {
   Music2,
   Pause,
@@ -11,173 +12,24 @@ import {
   VolumeX,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
-
-interface Track {
-  id: number;
-  name: string;
-  subtitle: string;
-  url: string;
-  color: string;
-  accentColor: string;
-  accentOklch: string;
-  emoji: string;
-}
-
-const TRACKS: Track[] = [
-  {
-    id: 1,
-    name: "Lofi Beats",
-    subtitle: "Chill & Creative",
-    url: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
-    color: "from-violet-900/40 via-indigo-900/30 to-transparent",
-    accentColor: "oklch(0.65 0.22 290)",
-    accentOklch: "0.65 0.22 290",
-    emoji: "🎵",
-  },
-  {
-    id: 2,
-    name: "Rain Sounds",
-    subtitle: "Nature & Calm",
-    url: "https://cdn.pixabay.com/audio/2022/03/10/audio_270f49e2df.mp3",
-    color: "from-cyan-900/40 via-blue-900/30 to-transparent",
-    accentColor: "oklch(0.7 0.15 210)",
-    accentOklch: "0.7 0.15 210",
-    emoji: "🌧️",
-  },
-  {
-    id: 3,
-    name: "Nature Vibes",
-    subtitle: "Relaxing & Fresh",
-    url: "https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1c12.mp3",
-    color: "from-emerald-900/40 via-teal-900/30 to-transparent",
-    accentColor: "oklch(0.7 0.18 155)",
-    accentOklch: "0.7 0.18 155",
-    emoji: "🌿",
-  },
-  {
-    id: 4,
-    name: "Deep Focus",
-    subtitle: "Concentration Mode",
-    url: "https://cdn.pixabay.com/audio/2024/02/28/audio_736439f96a.mp3",
-    color: "from-purple-900/40 via-indigo-900/30 to-transparent",
-    accentColor: "oklch(0.62 0.24 270)",
-    accentOklch: "0.62 0.24 270",
-    emoji: "🧠",
-  },
-  {
-    id: 5,
-    name: "White Noise",
-    subtitle: "Block Distractions",
-    url: "https://cdn.pixabay.com/audio/2022/03/24/audio_9b1e1a3b82.mp3",
-    color: "from-slate-800/40 via-slate-900/30 to-transparent",
-    accentColor: "oklch(0.6 0.04 265)",
-    accentOklch: "0.6 0.04 265",
-    emoji: "🌬️",
-  },
-];
 
 const BAR_COUNT = 12;
 
 export function MusicPlayer() {
-  const [currentTrack, setCurrentTrack] = useState<Track>(TRACKS[0]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(70);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLooping, setIsLooping] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const volumeRef = useRef(volume);
-  const isMutedRef = useRef(isMuted);
-  const isLoopingRef = useRef(isLooping);
-  const isPlayingRef = useRef(isPlaying);
-
-  volumeRef.current = volume;
-  isMutedRef.current = isMuted;
-  isLoopingRef.current = isLooping;
-  isPlayingRef.current = isPlaying;
-
-  useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
-    const audio = audioRef.current;
-    audio.crossOrigin = "anonymous";
-    audio.src = currentTrack.url;
-    audio.volume = (isMutedRef.current ? 0 : volumeRef.current) / 100;
-    audio.loop = isLoopingRef.current;
-    audio.load();
-    if (isPlayingRef.current) {
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          setIsPlaying(false);
-        });
-      }
-    }
-    return () => {
-      audio.pause();
-    };
-  }, [currentTrack]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.volume = (isMuted ? 0 : volume) / 100;
-  }, [volume, isMuted]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.loop = isLooping;
-  }, [isLooping]);
-
-  function togglePlay() {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => setIsPlaying(true))
-          .catch(() => setIsPlaying(false));
-      } else {
-        setIsPlaying(true);
-      }
-    }
-  }
-
-  function selectTrack(track: Track) {
-    const wasPlaying = isPlaying;
-    if (audioRef.current) audioRef.current.pause();
-    setIsPlaying(false);
-    setCurrentTrack(track);
-    if (wasPlaying) {
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.src = track.url;
-          audioRef.current.crossOrigin = "anonymous";
-          audioRef.current.load();
-          const p = audioRef.current.play();
-          if (p !== undefined) {
-            p.then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-          } else {
-            setIsPlaying(true);
-          }
-        }
-      }, 100);
-    }
-  }
-
-  function skipNext() {
-    const idx = TRACKS.findIndex((t) => t.id === currentTrack.id);
-    selectTrack(TRACKS[(idx + 1) % TRACKS.length]);
-  }
-
-  function skipPrev() {
-    const idx = TRACKS.findIndex((t) => t.id === currentTrack.id);
-    selectTrack(TRACKS[(idx - 1 + TRACKS.length) % TRACKS.length]);
-  }
+  const {
+    currentTrack,
+    isPlaying,
+    volume,
+    isMuted,
+    isLooping,
+    setVolume,
+    setIsMuted,
+    setIsLooping,
+    togglePlay,
+    selectTrack,
+    skipNext,
+    skipPrev,
+  } = useMusic();
 
   return (
     <div className="p-6 space-y-5 max-w-2xl mx-auto">

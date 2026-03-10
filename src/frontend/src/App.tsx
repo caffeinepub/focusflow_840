@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { MusicProvider } from "@/contexts/MusicContext";
+import { TimerProvider } from "@/contexts/TimerContext";
 import {
   BookOpen,
   Bot,
@@ -16,6 +18,7 @@ import { toast } from "sonner";
 import { AIAssistant } from "./components/AIAssistant";
 import { Dashboard } from "./components/Dashboard";
 import { Meditation } from "./components/Meditation";
+import { MiniStatusBar } from "./components/MiniStatusBar";
 import { MusicPlayer } from "./components/MusicPlayer";
 import { StudyTimer } from "./components/StudyTimer";
 import { TodoList } from "./components/TodoList";
@@ -82,7 +85,7 @@ const pageTransition = {
   ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number],
 };
 
-export default function App() {
+function AppInner() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -521,6 +524,12 @@ export default function App() {
         </nav>
       </div>
 
+      {/* Persistent mini status bar — timer + music always visible */}
+      <MiniStatusBar
+        onGoToTimer={() => setActiveTab("timer")}
+        onGoToMusic={() => setActiveTab("music")}
+      />
+
       <Toaster
         theme="dark"
         toastOptions={{
@@ -529,5 +538,15 @@ export default function App() {
         }}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <MusicProvider>
+      <TimerProvider>
+        <AppInner />
+      </TimerProvider>
+    </MusicProvider>
   );
 }
