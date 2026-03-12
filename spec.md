@@ -1,37 +1,40 @@
 # FocusFlow
 
 ## Current State
-- StudyTimer component tracks completed sessions count (local state) and calls `completeSession` when a timer finishes.
-- Session history is NOT stored anywhere — only a count is displayed with check-circle icons.
-- No dedicated "Session History" view or panel exists.
-- App.tsx has 6 nav tabs: dashboard, timer, music, tasks, meditation, ai.
+FocusFlow is a premium study companion app with dark glassmorphism UI. It has a sidebar, dashboard, study timer, music player, to-do list, meditation mode, AI assistant, whiteboard, and quotes. The current UI uses standard glassmorphism with basic animations.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `SessionHistory` type: `{ id: string; durationMinutes: number; completedAt: Date; label?: string }`
-- Local storage persistence for session history (localStorage key: `focusflow_sessions`)
-- Session history list rendered inside the StudyTimer page, below the existing custom duration card, showing each completed session with time, date, and duration.
-- When a session completes (`handleComplete`), push a new entry to the history list.
-- A "Clear History" button to wipe all stored sessions.
-- Empty state when no sessions exist.
-- Session count badge on the Trophy icon should reflect total sessions from history (not just current-tab count).
+- World-class premium UI overhaul with ultra-smooth animations and transitions
+- Custom OKLCH color system with deep midnight palette and vivid accent colors
+- Premium typography using Bricolage Grotesque for headings + Satoshi for body
+- Advanced micro-interactions: spring physics, staggered entry animations, magnetic hover effects
+- Liquid morphing transitions between sections
+- Premium sidebar with glowing active states and smooth spring animation
+- Elevated card designs with layered depth, subtle noise textures, and gradient borders
+- Dashboard hero section with ambient glow and animated stat counters
+- Cinematic blur-behind glassmorphism with proper light scattering
+- Bottom status bar with premium frosted glass and pill-shaped controls
 
 ### Modify
-- `StudyTimer.tsx`: Read/write session history from localStorage; show history panel below existing UI.
-- Completed sessions count shown in Trophy badge and check dots should come from history length.
+- All component colors to use new OKLCH token system
+- All transitions to use spring cubic-bezier curves (not linear)
+- Sidebar hover trigger to be more responsive and visually distinctive
+- Timer display to be more dramatic and immersive
+- Music player controls to feel tactile and premium
 
 ### Remove
-- Nothing removed.
+- Generic blue/purple gradient defaults
+- Flat boring card backgrounds
+- Abrupt transitions
 
 ## Implementation Plan
-1. Create a `useSessionHistory` hook that reads/writes to localStorage (`focusflow_sessions`).
-2. In `StudyTimer.tsx`, replace local `completed` state with history array from the hook.
-3. On `handleComplete`, push `{ id: crypto.randomUUID(), durationMinutes, completedAt: new Date() }` to history.
-4. Add a "Session History" card below the custom duration card:
-   - Header with title + "Clear" button (only shown when sessions exist)
-   - Scrollable list (max-height ~280px) of session rows sorted newest-first
-   - Each row: formatted time+date, duration badge, subtle divider
-   - Empty state when no history
-5. Apply smooth enter animations for new history items.
-6. Wire deterministic `data-ocid` markers: `session_history.clear_button`, `session_history.item.1`, `session_history.empty_state`.
+1. Redesign index.css with new OKLCH dark palette (deep midnight backgrounds, emerald/teal primary, amber accent)
+2. Update tailwind.config.js with Bricolage Grotesque + Satoshi fonts and new color tokens
+3. Overhaul App.tsx sidebar with spring animations, glowing nav items, and smooth transitions
+4. Redesign Dashboard.tsx with animated stat cards, ambient glow hero, and premium typography
+5. Polish StudyTimer.tsx with cinematic digit display and dramatic animations
+6. Refine MusicPlayer, TodoList, Meditation, AIAssistant, Whiteboard for visual consistency
+7. Premium MiniStatusBar with frosted glass pill design
+8. Validate and deploy

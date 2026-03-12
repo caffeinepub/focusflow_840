@@ -9,23 +9,20 @@ import {
   History,
   Quote,
   RefreshCw,
+  Timer,
   User,
 } from "lucide-react";
 import { motion, useInView, useMotionValue, useSpring } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import {
-  useGetCurrentStreak,
-  useGetRandomQuote,
-  useGetSessionHistory,
-} from "../hooks/useQueries";
+import { useGetRandomQuote } from "../hooks/useQueries";
+import { useSessionHistory } from "../hooks/useSessionHistory";
 
 interface DashboardProps {
   onStartTimer: () => void;
   nextWaterReminder: number | null;
 }
 
-// Animated counter component
 function AnimatedNumber({
   value,
   className,
@@ -64,12 +61,95 @@ function AnimatedNumber({
   );
 }
 
+// Circular progress ring for "Studied Today"
+function CircularProgress({
+  pct,
+  size = 56,
+  stroke = 3,
+  color = "oklch(0.72 0.17 162)",
+  trackColor = "oklch(0.72 0.17 162 / 0.12)",
+}: {
+  pct: number;
+  size?: number;
+  stroke?: number;
+  color?: string;
+  trackColor?: string;
+}) {
+  const r = (size - stroke * 2) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  return (
+    <svg
+      width={size}
+      height={size}
+      aria-label="Progress ring"
+      role="img"
+      style={{ transform: "rotate(-90deg)" }}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        stroke={trackColor}
+        strokeWidth={stroke}
+        fill="none"
+      />
+      <motion.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        stroke={color}
+        strokeWidth={stroke}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        initial={{ strokeDashoffset: circ }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+        style={{
+          filter: `drop-shadow(0 0 4px ${color})`,
+        }}
+      />
+    </svg>
+  );
+}
+
+// Typewriter text component
+function TypewriterText({
+  text,
+  className,
+}: { text: string; className?: string }) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) {
+        clearInterval(interval);
+        setTimeout(() => setDone(true), 800);
+      }
+    }, 48);
+    return () => clearInterval(interval);
+  }, [text]);
+
+  return (
+    <span className={className}>
+      {displayed}
+      {!done && <span className="blink-cursor text-primary ml-0.5">|</span>}
+    </span>
+  );
+}
+
 export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
   const { data: quote, isLoading: quoteLoading } = useGetRandomQuote();
-  const { data: streak, isLoading: streakLoading } = useGetCurrentStreak();
-  const { data: sessions, isLoading: sessionsLoading } = useGetSessionHistory();
+  const { sessions, streak, todaySessions, todayMinutes } = useSessionHistory();
 
   const principal = identity?.getPrincipal().toString();
   const shortPrincipal = principal
@@ -78,20 +158,20 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
 
   const quotes = [
     "The secret of getting ahead is getting started.",
-    "It always seems impossible until it's done. — Nelson Mandela",
-    "Don't watch the clock; do what it does. Keep going. — Sam Levenson",
-    "The future belongs to those who believe in the beauty of their dreams. — Eleanor Roosevelt",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts. — Winston Churchill",
-    "Believe you can and you're halfway there. — Theodore Roosevelt",
-    "You don't have to be great to start, but you have to start to be great. — Zig Ziglar",
-    "Hard work beats talent when talent doesn't work hard. — Tim Notke",
-    "The only way to do great work is to love what you do. — Steve Jobs",
-    "In the middle of difficulty lies opportunity. — Albert Einstein",
-    "Education is the most powerful weapon you can use to change the world. — Nelson Mandela",
-    "An investment in knowledge pays the best interest. — Benjamin Franklin",
-    "The more that you read, the more things you will know. — Dr. Seuss",
-    "Learning never exhausts the mind. — Leonardo da Vinci",
-    "Success is the sum of small efforts repeated day in and day out. — Robert Collier",
+    "It always seems impossible until it's done. \u2014 Nelson Mandela",
+    "Don't watch the clock; do what it does. Keep going. \u2014 Sam Levenson",
+    "The future belongs to those who believe in the beauty of their dreams. \u2014 Eleanor Roosevelt",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts. \u2014 Winston Churchill",
+    "Believe you can and you're halfway there. \u2014 Theodore Roosevelt",
+    "You don't have to be great to start, but you have to start to be great. \u2014 Zig Ziglar",
+    "Hard work beats talent when talent doesn't work hard. \u2014 Tim Notke",
+    "The only way to do great work is to love what you do. \u2014 Steve Jobs",
+    "In the middle of difficulty lies opportunity. \u2014 Albert Einstein",
+    "Education is the most powerful weapon you can use to change the world. \u2014 Nelson Mandela",
+    "An investment in knowledge pays the best interest. \u2014 Benjamin Franklin",
+    "The more that you read, the more things you will know. \u2014 Dr. Seuss",
+    "Learning never exhausts the mind. \u2014 Leonardo da Vinci",
+    "Success is the sum of small efforts repeated day in and day out. \u2014 Robert Collier",
     "Push yourself, because no one else is going to do it for you.",
     "Great things never come from comfort zones.",
     "Dream it. Wish it. Do it.",
@@ -115,9 +195,8 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
     return () => clearInterval(interval);
   }, []);
 
-  function formatDate(ns: bigint): string {
-    const ms = Number(ns / BigInt(1_000_000));
-    return new Date(ms).toLocaleDateString("en-US", {
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -132,11 +211,23 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
     return `In ${mins} min`;
   }
 
-  const recentSessions = sessions?.slice(-5).reverse() ?? [];
-  const streakVal = Number(streak?.toString() ?? "0");
-  const sessionsVal = sessions?.length ?? 0;
+  function formatStudyTime(minutes: number): string {
+    if (minutes === 0) return "0 min";
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h === 0) return `${m} min`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  }
 
-  // Stagger variants for stat cards
+  const recentSessions = sessions.slice(0, 5);
+  const streakVal = streak;
+  const sessionsVal = todaySessions.length;
+
+  // Daily goal: 2 hours = 120 min
+  const dailyGoalMinutes = 120;
+  const studyPct = Math.min(100, (todayMinutes / dailyGoalMinutes) * 100);
+
   const cardVariants = {
     hidden: { opacity: 0, y: 28, scale: 0.96 },
     visible: (i: number) => ({
@@ -144,34 +235,52 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
       y: 0,
       scale: 1,
       transition: {
-        delay: 0.08 + i * 0.09,
+        delay: 0.07 + i * 0.08,
         duration: 0.45,
-        ease: "easeOut" as const,
+        ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number],
       },
     }),
   };
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      {/* Header */}
+      {/* Hero header */}
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
+        initial={{ opacity: 0, y: -18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="flex items-start justify-between gap-4"
+        transition={{
+          duration: 0.5,
+          ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number],
+        }}
+        className="flex items-start justify-between gap-4 relative"
       >
-        <div>
-          <h1 className="page-heading text-foreground leading-tight">
-            Dashboard
+        {/* Ambient glow behind heading */}
+        <div
+          className="absolute -left-4 -top-4 w-64 h-24 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse at 20% 50%, oklch(0.72 0.17 162 / 0.12) 0%, transparent 70%)",
+            filter: "blur(20px)",
+          }}
+        />
+        <div className="relative">
+          <h1
+            className="page-heading text-foreground leading-tight"
+            style={{
+              fontFamily:
+                "'Bricolage Grotesque', 'Sora', system-ui, sans-serif",
+            }}
+          >
+            <TypewriterText text="Welcome back! 👋" />
           </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm tracking-wide">
-            Good to see you. Let's make today count.
+          <p className="text-muted-foreground mt-2 text-sm tracking-wide">
+            Good to see you. Let’s make today count.
           </p>
         </div>
         {shortPrincipal && (
           <motion.div
             className="glass-card rounded-xl px-3 py-2 flex items-center gap-2 flex-shrink-0 mt-1"
-            whileHover={{ scale: 1.02 }}
+            whileHover={{ scale: 1.02, y: -1 }}
             transition={{ type: "spring", stiffness: 400, damping: 20 }}
           >
             <User className="w-3.5 h-3.5 text-primary" />
@@ -182,133 +291,171 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
         )}
       </motion.div>
 
-      {/* Stat cards — shimmer on hover, animated counters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Streak */}
         <motion.div
-          className="glass-stat rounded-2xl p-5 flex items-center gap-4 cursor-default"
+          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
           custom={0}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
           whileHover={{
-            y: -3,
-            transition: {
-              type: "spring",
-              stiffness: 350,
-              damping: 22,
-              mass: 0.6,
-            },
+            y: -4,
+            transition: { type: "spring", stiffness: 380, damping: 22 },
           }}
         >
           <motion.div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center bg-orange-500/10 border border-orange-500/25 flex-shrink-0"
+            className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
-              boxShadow:
-                "0 0 28px oklch(0.75 0.18 45 / 0.25), 0 0 60px oklch(0.75 0.18 45 / 0.08)",
+              background: "oklch(0.78 0.16 75 / 0.12)",
+              border: "1px solid oklch(0.78 0.16 75 / 0.25)",
+              boxShadow: "0 0 24px oklch(0.78 0.16 75 / 0.22)",
             }}
-            whileHover={{ scale: 1.1, rotate: -5 }}
-            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{
+              duration: 3,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
           >
-            <Flame className="w-7 h-7 text-orange-400" />
+            <span className="animate-flame-dance text-2xl select-none">🔥</span>
           </motion.div>
-          <div>
-            <div className="section-label text-muted-foreground mb-1.5">
-              Study Streak
+          <div className="relative z-10">
+            <div className="section-label text-muted-foreground mb-1">
+              Day Streak
             </div>
-            {streakLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <div className="flex items-baseline gap-1.5">
-                <AnimatedNumber
-                  value={streakVal}
-                  className="text-4xl font-display font-bold text-gradient-orange tabular-nums"
-                />
-                <span className="text-sm text-muted-foreground">days</span>
-              </div>
-            )}
+            <div className="flex items-baseline gap-1">
+              <AnimatedNumber
+                value={streakVal}
+                className="text-3xl font-display font-bold text-gradient-orange tabular-nums"
+              />
+              <span className="text-xs text-muted-foreground">days</span>
+            </div>
           </div>
         </motion.div>
 
-        {/* Sessions */}
+        {/* Today's sessions */}
         <motion.div
-          className="glass-stat rounded-2xl p-5 flex items-center gap-4 cursor-default"
+          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
           custom={1}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
           whileHover={{
-            y: -3,
-            transition: {
-              type: "spring",
-              stiffness: 350,
-              damping: 22,
-              mass: 0.6,
-            },
+            y: -4,
+            transition: { type: "spring", stiffness: 380, damping: 22 },
           }}
         >
           <motion.div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center bg-primary/10 border border-primary/25 flex-shrink-0"
+            className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
-              boxShadow:
-                "0 0 28px oklch(0.62 0.24 270 / 0.25), 0 0 60px oklch(0.62 0.24 270 / 0.08)",
+              background: "oklch(0.72 0.17 162 / 0.12)",
+              border: "1px solid oklch(0.72 0.17 162 / 0.25)",
+              boxShadow: "0 0 24px oklch(0.72 0.17 162 / 0.22)",
             }}
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={{ type: "spring", stiffness: 400, damping: 15 }}
           >
-            <BookOpen className="w-7 h-7 text-primary" />
+            <BookOpen className="w-6 h-6 text-primary" />
           </motion.div>
-          <div>
-            <div className="section-label text-muted-foreground mb-1.5">
-              Total Sessions
+          <div className="relative z-10">
+            <div className="section-label text-muted-foreground mb-1">
+              Today’s Sessions
             </div>
-            {sessionsLoading ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <div className="flex items-baseline gap-1.5">
-                <AnimatedNumber
-                  value={sessionsVal}
-                  className="text-4xl font-display font-bold text-gradient-primary tabular-nums"
-                />
-                <span className="text-sm text-muted-foreground">done</span>
-              </div>
-            )}
+            <div className="flex items-baseline gap-1">
+              <AnimatedNumber
+                value={sessionsVal}
+                className="text-3xl font-display font-bold text-gradient-primary tabular-nums"
+              />
+              <span className="text-xs text-muted-foreground">done</span>
+            </div>
           </div>
         </motion.div>
 
-        {/* Water reminder */}
+        {/* Studied Today — with circular progress ring */}
         <motion.div
-          className="glass-stat rounded-2xl p-5 flex items-center gap-4 cursor-default"
+          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
           custom={2}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
           whileHover={{
-            y: -3,
-            transition: {
-              type: "spring",
-              stiffness: 350,
-              damping: 22,
-              mass: 0.6,
-            },
+            y: -4,
+            transition: { type: "spring", stiffness: 380, damping: 22 },
+          }}
+        >
+          <div className="relative flex-shrink-0">
+            <CircularProgress
+              pct={studyPct}
+              size={52}
+              stroke={3}
+              color="oklch(0.72 0.17 162)"
+              trackColor="oklch(0.72 0.17 162 / 0.12)"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Timer
+                className="w-5 h-5"
+                style={{ color: "oklch(0.72 0.17 162)" }}
+              />
+            </div>
+          </div>
+          <div className="relative z-10 min-w-0">
+            <div className="section-label text-muted-foreground mb-1">
+              Studied Today
+            </div>
+            <motion.div
+              key={todayMinutes}
+              initial={{ opacity: 0, scale: 0.88 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
+              className="text-xl font-display font-bold text-gradient-primary"
+            >
+              {formatStudyTime(todayMinutes)}
+            </motion.div>
+            <div className="text-[10px] text-muted-foreground/50 mt-0.5">
+              Goal: 2h
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Water reminder */}
+        <motion.div
+          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
+          custom={3}
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          whileHover={{
+            y: -4,
+            transition: { type: "spring", stiffness: 380, damping: 22 },
           }}
         >
           <motion.div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center bg-cyan-500/10 border border-cyan-500/25 flex-shrink-0"
+            className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
-              boxShadow:
-                "0 0 28px oklch(0.7 0.15 210 / 0.25), 0 0 60px oklch(0.7 0.15 210 / 0.08)",
+              background: "oklch(0.70 0.15 210 / 0.12)",
+              border: "1px solid oklch(0.70 0.15 210 / 0.25)",
+              boxShadow: "0 0 24px oklch(0.70 0.15 210 / 0.22)",
             }}
-            whileHover={{ scale: 1.1, rotate: -5 }}
-            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{
+              duration: 4,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: 1.5,
+            }}
           >
-            <Droplets className="w-7 h-7 text-cyan-400" />
+            <Droplets
+              className="w-6 h-6"
+              style={{ color: "oklch(0.80 0.15 205)" }}
+            />
           </motion.div>
-          <div>
-            <div className="section-label text-muted-foreground mb-1.5">
-              Water Reminder
+          <div className="relative z-10">
+            <div className="section-label text-muted-foreground mb-1">
+              Hydration
             </div>
-            <div className="text-xl font-display font-bold text-gradient-cyan">
+            <div className="text-lg font-display font-bold text-gradient-cyan">
               {formatWaterReminder()}
             </div>
           </div>
@@ -317,30 +464,42 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
 
       {/* Quote + Quick Start */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Motivational quote */}
+        {/* Quote card */}
         <motion.div
-          className="glass-elevated rounded-2xl p-6 relative overflow-hidden"
+          className="glass-elevated gradient-border rounded-2xl p-6 relative overflow-hidden"
           initial={{ opacity: 0, x: -24, scale: 0.97 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{
-            delay: 0.28,
-            duration: 0.45,
-            ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+            delay: 0.3,
+            duration: 0.5,
+            ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number],
           }}
         >
-          {/* Subtle decorative bg */}
+          {/* Decorative gradient orb */}
           <div
-            className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20 pointer-events-none"
+            className="absolute top-0 right-0 w-36 h-36 rounded-full opacity-20 pointer-events-none"
             style={{
               background:
-                "radial-gradient(circle, oklch(0.62 0.24 270 / 0.3) 0%, transparent 70%)",
+                "radial-gradient(circle, oklch(0.72 0.17 162 / 0.35) 0%, transparent 70%)",
               transform: "translate(30%, -30%)",
             }}
           />
-          <div className="flex items-center justify-between mb-4 relative">
+          {/* Decorative left border gradient line */}
+          <div
+            className="absolute left-0 top-6 bottom-6 w-0.5 rounded-full"
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent, oklch(0.72 0.17 162 / 0.6), oklch(0.78 0.16 75 / 0.4), transparent)",
+            }}
+          />
+          <div className="flex items-center justify-between mb-5 relative">
             <div className="flex items-center gap-2.5">
               <motion.div
-                className="w-7 h-7 rounded-lg flex items-center justify-center bg-primary/15 border border-primary/20"
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{
+                  background: "oklch(0.72 0.17 162 / 0.15)",
+                  border: "1px solid oklch(0.72 0.17 162 / 0.22)",
+                }}
                 whileHover={{ rotate: 15, scale: 1.1 }}
                 transition={{ type: "spring", stiffness: 400 }}
               >
@@ -359,7 +518,7 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
                 size="sm"
                 onClick={refreshQuote}
                 data-ocid="dashboard.refresh_quote.button"
-                className="h-8 w-8 p-0 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                className="h-8 w-8 p-0 rounded-lg hover:bg-primary/12 text-muted-foreground hover:text-primary transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </Button>
@@ -374,41 +533,46 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
           ) : (
             <motion.p
               key={quote}
-              initial={{ opacity: 0, y: 8, scale: 0.99 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="text-foreground/90 text-base leading-relaxed relative"
+              className="text-foreground/90 text-base leading-relaxed relative pl-3"
               style={{ fontStyle: "italic" }}
             >
-              "{quote ?? "The secret of getting ahead is getting started."}"
+              &ldquo;
+              {quote ?? "The secret of getting ahead is getting started."}
+              &rdquo;
             </motion.p>
           )}
         </motion.div>
 
         {/* Quick start */}
         <motion.div
-          className="glass-elevated rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden"
+          className="glass-elevated gradient-border rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden"
           initial={{ opacity: 0, x: 24, scale: 0.97 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{
-            delay: 0.34,
-            duration: 0.45,
-            ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+            delay: 0.36,
+            duration: 0.5,
+            ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number],
           }}
         >
-          {/* Decorative gradient bg */}
           <div
-            className="absolute bottom-0 right-0 w-40 h-40 rounded-full opacity-15 pointer-events-none"
+            className="absolute bottom-0 right-0 w-44 h-44 rounded-full opacity-15 pointer-events-none"
             style={{
               background:
-                "radial-gradient(circle, oklch(0.62 0.24 270 / 0.5) 0%, transparent 70%)",
+                "radial-gradient(circle, oklch(0.72 0.17 162 / 0.55) 0%, transparent 70%)",
               transform: "translate(20%, 20%)",
             }}
           />
           <div className="relative">
             <div className="flex items-center gap-2.5 mb-3">
               <motion.div
-                className="w-7 h-7 rounded-lg flex items-center justify-center bg-primary/15 border border-primary/20"
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{
+                  background: "oklch(0.72 0.17 162 / 0.15)",
+                  border: "1px solid oklch(0.72 0.17 162 / 0.22)",
+                }}
                 whileHover={{ rotate: -10, scale: 1.1 }}
                 transition={{ type: "spring", stiffness: 400 }}
               >
@@ -418,18 +582,25 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
                 Quick Start
               </span>
             </div>
-            <p className="text-foreground/75 text-sm mb-5 leading-relaxed">
+            <p className="text-foreground/70 text-sm mb-5 leading-relaxed">
               Begin a 25-minute Pomodoro focus session. Enter flow state.
             </p>
           </div>
           <motion.div whileTap={{ scale: 0.97 }} className="relative">
             <Button
               onClick={onStartTimer}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl glow-primary transition-all duration-200 text-sm tracking-wide relative overflow-hidden group"
+              data-ocid="dashboard.start_session.primary_button"
+              className="w-full h-12 font-semibold rounded-xl transition-all duration-200 text-sm tracking-wide relative overflow-hidden group active:scale-95"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.72 0.17 162), oklch(0.60 0.20 175))",
+                color: "oklch(0.07 0.01 162)",
+                boxShadow:
+                  "0 0 28px oklch(0.72 0.17 162 / 0.35), 0 4px 16px oklch(0.72 0.17 162 / 0.25)",
+              }}
             >
               <span className="relative z-10">Start Focus Session →</span>
-              {/* Shimmer on hover */}
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-[-15deg]" />
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-[-15deg]" />
             </Button>
           </motion.div>
         </motion.div>
@@ -437,30 +608,30 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
 
       {/* Session history */}
       <motion.div
-        className="glass-card rounded-2xl p-6"
+        className="glass-card gradient-border rounded-2xl p-6"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{
-          delay: 0.38,
+          delay: 0.42,
           duration: 0.45,
           ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
         }}
       >
         <div className="flex items-center gap-2.5 mb-5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-primary/15 border border-primary/20">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{
+              background: "oklch(0.72 0.17 162 / 0.15)",
+              border: "1px solid oklch(0.72 0.17 162 / 0.22)",
+            }}
+          >
             <History className="w-3.5 h-3.5 text-primary" />
           </div>
           <span className="section-label text-muted-foreground">
             Recent Sessions
           </span>
         </div>
-        {sessionsLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-12 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : recentSessions.length === 0 ? (
+        {recentSessions.length === 0 ? (
           <div
             data-ocid="dashboard.sessions.empty_state"
             className="text-center py-10"
@@ -474,33 +645,52 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
                 damping: 18,
                 delay: 0.1,
               }}
-              className="w-14 h-14 rounded-2xl bg-white/3 border border-white/5 flex items-center justify-center mx-auto mb-4"
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{
+                background: "oklch(0.72 0.17 162 / 0.06)",
+                border: "1px solid oklch(0.72 0.17 162 / 0.10)",
+              }}
             >
-              <BookOpen className="w-7 h-7 text-muted-foreground/25" />
+              <BookOpen className="w-7 h-7 text-muted-foreground/30" />
             </motion.div>
             <p className="text-muted-foreground text-sm">
               No sessions yet. Start your first study session!
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {recentSessions.map((session, idx) => (
               <motion.div
-                key={`${session.date.toString()}-${idx}`}
+                key={session.id}
                 className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-white/4 transition-colors group"
-                initial={{ opacity: 0, x: -12 }}
+                initial={{ opacity: 0, x: -14 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.06 }}
-                whileHover={{ x: 2 }}
+                transition={{
+                  delay: idx * 0.06,
+                  ease: [0.34, 1.56, 0.64, 1],
+                  duration: 0.4,
+                }}
+                whileHover={{ x: 3 }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full transition-colors"
+                    style={{
+                      background: "oklch(0.72 0.17 162 / 0.65)",
+                      boxShadow: "0 0 5px oklch(0.72 0.17 162 / 0.5)",
+                    }}
+                  />
                   <span className="text-sm text-muted-foreground">
-                    {formatDate(session.date)}
+                    {formatDate(session.completedAt)}
                   </span>
                 </div>
-                <span className="text-sm font-semibold font-display text-primary/80 group-hover:text-primary transition-colors">
-                  {session.durationMinutes.toString()} min
+                <span
+                  className="text-sm font-semibold font-display"
+                  style={{
+                    color: "oklch(0.72 0.17 162 / 0.85)",
+                  }}
+                >
+                  {session.durationMinutes} min
                 </span>
               </motion.div>
             ))}

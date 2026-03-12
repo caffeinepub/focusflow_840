@@ -4,7 +4,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Bot, Loader2, Send, Sparkles, User } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useAskQuestion } from "../hooks/useQueries";
 
 interface Message {
   id: string;
@@ -19,11 +18,108 @@ const QUICK_QUESTIONS = [
   "Help me stay motivated",
 ];
 
+const AI_KNOWLEDGE: Array<{ keywords: string[]; response: string }> = [
+  {
+    keywords: ["pomodoro", "technique", "timer method"],
+    response:
+      "The Pomodoro Technique is a time management method developed by Francesco Cirillo. It works like this: 1) Choose a task. 2) Set a timer for 25 minutes and work with full focus. 3) Take a 5-minute break. 4) After 4 pomodoros, take a longer 15–30 minute break. It helps beat procrastination and keeps your mind fresh!",
+  },
+  {
+    keywords: ["focus", "concentrate", "distraction", "attention"],
+    response:
+      "To focus better: Remove distractions (phone on silent, close unrelated tabs). Use the Pomodoro technique for structured work intervals. Try ambient music or white noise to drown out background noise. Keep water nearby and stay hydrated. Set a clear intention before each study session — write down exactly what you want to accomplish.",
+  },
+  {
+    keywords: ["motivat", "lazy", "procrastinat", "stuck"],
+    response:
+      "Motivation tips: Break your task into tiny, concrete steps — just start with 2 minutes. Reward yourself after completing blocks of work. Remind yourself of your 'why' — why does this matter to you? Visualize finishing and the feeling it brings. Progress, not perfection! Even 20 minutes of focused study is a win.",
+  },
+  {
+    keywords: [
+      "study tip",
+      "study habit",
+      "how to study",
+      "study better",
+      "study smart",
+    ],
+    response:
+      "Top study tips: 1) Active recall — test yourself instead of re-reading notes. 2) Spaced repetition — review material at increasing intervals. 3) Teach what you learn to someone else. 4) Mix subjects (interleaving) to boost retention. 5) Get enough sleep — memory consolidates during sleep. 6) Use the Feynman technique: explain concepts in simple words.",
+  },
+  {
+    keywords: ["memory", "remember", "forget", "memorize", "retention"],
+    response:
+      "To improve memory: Use spaced repetition (tools like Anki work great). Create vivid mental images or stories around facts. Use acronyms and mnemonics. Teach it to someone else — explanation strengthens encoding. Sleep is crucial — don't skip it before exams. Exercise also significantly boosts memory and cognitive function.",
+  },
+  {
+    keywords: ["note", "notes", "note-taking"],
+    response:
+      "Effective note-taking methods: Try the Cornell Method (main notes on the right, cues/keywords on the left, summary at the bottom). Mind mapping works great for visual learners. Use the outline method for structured lectures. Don't copy everything verbatim — paraphrase in your own words to process information better.",
+  },
+  {
+    keywords: ["exam", "test", "revision", "review"],
+    response:
+      "Exam preparation tips: Start revising at least a week early. Focus on past papers — they reveal patterns. Use active recall: cover your notes and try to recall the content. Prioritize weaker topics but don't ignore strengths. On exam day, get good sleep, eat well, and read questions carefully before answering.",
+  },
+  {
+    keywords: ["stress", "anxious", "anxiety", "overwhelm", "burnout"],
+    response:
+      "Feeling overwhelmed is normal. Take it one step at a time. Try box breathing: inhale 4 counts, hold 4, exhale 4, hold 4. Write down everything on your mind to clear mental clutter. Take short breaks — your brain needs rest to perform well. Remember: rest is productive. Speak to someone if stress becomes too much.",
+  },
+  {
+    keywords: ["sleep", "tired", "rest"],
+    response:
+      "Sleep is one of the most powerful study tools. During sleep, your brain consolidates and organizes what you learned. Aim for 7–9 hours. Avoid screens an hour before bed. Pulling all-nighters often backfires — a rested brain outperforms an exhausted one every time.",
+  },
+  {
+    keywords: ["math", "mathematics", "calculus", "algebra", "equation"],
+    response:
+      "For math: Practice daily — math is a skill, not just knowledge. Work through problems step by step and understand each step before moving on. When stuck, try solving a simpler version of the problem first. Review your mistakes — they're your best teachers. Khan Academy and YouTube are great free resources.",
+  },
+  {
+    keywords: ["science", "physics", "chemistry", "biology"],
+    response:
+      "For science subjects: Connect concepts to real-world examples to make them stick. Draw diagrams whenever possible — visual representations help enormously. For physics/chemistry, practice derivations and problem-solving. For biology, use mnemonics for processes and systems. Understanding mechanisms beats rote memorization.",
+  },
+  {
+    keywords: ["reading", "textbook", "book", "comprehension"],
+    response:
+      "For effective reading: Preview the chapter (headings, summaries) before reading in full. Read actively — ask questions as you go. After each section, pause and recall the key ideas without looking. Annotate or highlight sparingly. Summarize each chapter in your own words after finishing.",
+  },
+  {
+    keywords: ["time management", "schedule", "plan", "organize", "routine"],
+    response:
+      "Time management essentials: Plan your week on Sunday — block time for study, breaks, and fun. Prioritize with the Eisenhower Matrix (urgent/important). Batch similar tasks together. Set specific start/end times for study blocks. Track how you actually spend your time for a week — most people are surprised by the results.",
+  },
+  {
+    keywords: ["break", "rest", "relax", "recharge"],
+    response:
+      "Breaks are essential, not optional! Short breaks (5–10 min) after 25–45 min of focused work maintain peak performance. During breaks: step away from screens, stretch, take a short walk, or do deep breathing. Longer breaks (20–30 min) after every 4 sessions help prevent burnout.",
+  },
+  {
+    keywords: ["goal", "target", "achieve", "success"],
+    response:
+      "Set SMART goals: Specific, Measurable, Achievable, Relevant, Time-bound. Break big goals into weekly and daily milestones. Track your progress — seeing progress is motivating. Celebrate small wins. Adjust goals as needed; flexibility is a strength, not a failure.",
+  },
+];
+
+function getAIResponse(question: string): string {
+  const q = question.toLowerCase();
+  for (const item of AI_KNOWLEDGE) {
+    for (const keyword of item.keywords) {
+      if (q.includes(keyword)) {
+        return item.response;
+      }
+    }
+  }
+  // Fallback
+  return "Great question! Here's a general study tip: The most effective learners use active recall (testing themselves), spaced repetition (revisiting material over time), and interleaved practice (mixing topics). Try to understand concepts deeply rather than memorizing surface facts. Is there a specific subject or challenge I can help you with?";
+}
+
 export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [isPending, setIsPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { mutate: askQuestion, isPending } = useAskQuestion();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrollRef is stable
   useEffect(() => {
@@ -34,7 +130,7 @@ export function AIAssistant() {
 
   function sendMessage(text: string) {
     const question = text.trim();
-    if (!question) return;
+    if (!question || isPending) return;
     setInput("");
 
     const userMsg: Message = {
@@ -43,25 +139,22 @@ export function AIAssistant() {
       content: question,
     };
     setMessages((prev) => [...prev, userMsg]);
+    setIsPending(true);
 
-    askQuestion(question, {
-      onSuccess: (answer) => {
+    // Simulate a short thinking delay for a natural feel
+    setTimeout(
+      () => {
+        const answer = getAIResponse(question);
         const aiMsg: Message = {
           id: `a-${Date.now()}`,
           role: "assistant",
           content: answer,
         };
         setMessages((prev) => [...prev, aiMsg]);
+        setIsPending(false);
       },
-      onError: () => {
-        const errMsg: Message = {
-          id: `e-${Date.now()}`,
-          role: "assistant",
-          content: "Sorry, I couldn't process that. Please try again.",
-        };
-        setMessages((prev) => [...prev, errMsg]);
-      },
-    });
+      700 + Math.random() * 500,
+    );
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

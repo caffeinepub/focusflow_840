@@ -10,7 +10,14 @@ export interface Track {
   accentColor: string;
   accentOklch: string;
   emoji: string;
-  procedural?: "whitenoise" | "rain" | "nature" | "focus";
+  procedural?:
+    | "whitenoise"
+    | "rain"
+    | "nature"
+    | "focus"
+    | "lofi-cafe"
+    | "lofi-rain"
+    | "lofi-dreams";
 }
 
 export const TRACKS: Track[] = [
@@ -23,6 +30,49 @@ export const TRACKS: Track[] = [
     accentColor: "oklch(0.65 0.22 290)",
     accentOklch: "0.65 0.22 290",
     emoji: "🎵",
+  },
+  {
+    id: 6,
+    name: "Lofi Study",
+    subtitle: "Warm & Smooth",
+    url: "https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3",
+    color: "from-violet-900/40 via-indigo-900/30 to-transparent",
+    accentColor: "oklch(0.65 0.22 290)",
+    accentOklch: "0.65 0.22 290",
+    emoji: "📚",
+  },
+  {
+    id: 7,
+    name: "Lofi Cafe",
+    subtitle: "Coffee & Vibes",
+    url: "",
+    procedural: "lofi-cafe",
+    color: "from-amber-900/40 via-yellow-900/30 to-transparent",
+    accentColor: "oklch(0.72 0.17 65)",
+    accentOklch: "0.72 0.17 65",
+    emoji: "☕",
+  },
+  {
+    id: 8,
+    name: "Lofi Dreams",
+    subtitle: "Dreamy & Mellow",
+    url: "",
+    procedural: "lofi-dreams",
+    color: "from-pink-900/40 via-rose-900/30 to-transparent",
+    accentColor: "oklch(0.68 0.19 350)",
+    accentOklch: "0.68 0.19 350",
+    emoji: "🌙",
+  },
+  {
+    id: 9,
+    name: "Lofi Rain",
+    subtitle: "Rainy Day Focus",
+    url: "",
+    procedural: "lofi-rain",
+    color: "from-blue-900/40 via-indigo-900/30 to-transparent",
+    accentColor: "oklch(0.65 0.18 240)",
+    accentOklch: "0.65 0.18 240",
+    emoji: "🌂",
   },
   {
     id: 2,
@@ -69,6 +119,9 @@ export const TRACKS: Track[] = [
     emoji: "🌬️",
   },
 ];
+
+const LOFI_IDS = new Set([1, 6, 7, 8, 9]);
+export { LOFI_IDS };
 
 // --- Procedural Audio Generators ---
 
@@ -224,6 +277,190 @@ function createWhiteNoiseNode(ctx: AudioContext): AudioNode {
   return gain;
 }
 
+// Lofi Cafe: warm coffee shop ambient — soft brown noise + gentle melodic plucks
+function createLofiCafeNode(ctx: AudioContext): AudioNode {
+  const master = ctx.createGain();
+  master.gain.value = 0.38;
+
+  // Warm brown-ish noise base (low-passed white noise)
+  const bufferSize = ctx.sampleRate * 4;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let lastOut = 0;
+  for (let i = 0; i < bufferSize; i++) {
+    const white = Math.random() * 2 - 1;
+    lastOut = (lastOut + 0.02 * white) / 1.02;
+    data[i] = lastOut * 14;
+  }
+  const noiseSource = ctx.createBufferSource();
+  noiseSource.buffer = buffer;
+  noiseSource.loop = true;
+  const noiseLPF = ctx.createBiquadFilter();
+  noiseLPF.type = "lowpass";
+  noiseLPF.frequency.value = 400;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.18;
+  noiseSource.connect(noiseLPF);
+  noiseLPF.connect(noiseGain);
+  noiseGain.connect(master);
+  noiseSource.start();
+
+  // Gentle chord pad (warm fifths)
+  const chordFreqs = [130.81, 196, 261.63, 329.63]; // C3, G3, C4, E4
+  for (const freq of chordFreqs) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq + (Math.random() - 0.5) * 2;
+    g.gain.value = 0.04;
+    osc.connect(g);
+    g.connect(master);
+    osc.start();
+  }
+
+  // Occasional soft pluck
+  function pluck() {
+    const notes = [261.63, 293.66, 329.63, 349.23, 392, 440, 523.25];
+    const freq = notes[Math.floor(Math.random() * notes.length)];
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.12, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+    osc.connect(g);
+    g.connect(master);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 1.3);
+    setTimeout(pluck, 800 + Math.random() * 2000);
+  }
+  setTimeout(pluck, 300);
+
+  return master;
+}
+
+// Lofi Rain: gentle rain texture + soft tonal hum
+function createLofiRainNode(ctx: AudioContext): AudioNode {
+  const master = ctx.createGain();
+  master.gain.value = 0.42;
+
+  // Rain layer
+  const bufferSize = ctx.sampleRate * 3;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const rainSource = ctx.createBufferSource();
+  rainSource.buffer = buffer;
+  rainSource.loop = true;
+  const lpf = ctx.createBiquadFilter();
+  lpf.type = "lowpass";
+  lpf.frequency.value = 1800;
+  const hpf = ctx.createBiquadFilter();
+  hpf.type = "highpass";
+  hpf.frequency.value = 200;
+  const rainGain = ctx.createGain();
+  rainGain.gain.value = 0.5;
+  rainSource.connect(lpf);
+  lpf.connect(hpf);
+  hpf.connect(rainGain);
+  rainGain.connect(master);
+  rainSource.start();
+
+  // Subtle low drone for coziness
+  const drone = ctx.createOscillator();
+  const droneGain = ctx.createGain();
+  drone.type = "sine";
+  drone.frequency.value = 110;
+  droneGain.gain.value = 0.06;
+  drone.connect(droneGain);
+  droneGain.connect(master);
+  drone.start();
+
+  // Slow LFO swell on rain
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+  lfo.frequency.value = 0.05;
+  lfoGain.gain.value = 0.12;
+  lfo.connect(lfoGain);
+  lfoGain.connect(rainGain.gain);
+  lfo.start();
+
+  // Occasional soft note
+  function rainNote() {
+    const notes = [220, 261.63, 293.66, 329.63];
+    const freq = notes[Math.floor(Math.random() * notes.length)];
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.4);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.5);
+    osc.connect(g);
+    g.connect(master);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 2.6);
+    setTimeout(rainNote, 2000 + Math.random() * 4000);
+  }
+  setTimeout(rainNote, 1000);
+
+  return master;
+}
+
+// Lofi Dreams: dreamy pads + slow evolving tones
+function createLofiDreamsNode(ctx: AudioContext): AudioNode {
+  const master = ctx.createGain();
+  master.gain.value = 0.32;
+
+  // Dreamy pad — layered sine oscillators slowly detuned
+  const padFreqs = [164.81, 220, 261.63, 392]; // E3, A3, C4, G4
+  for (const freq of padFreqs) {
+    for (let d = 0; d < 3; d++) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq + (d - 1) * 0.5;
+      g.gain.value = 0.045;
+      // Slow LFO per voice
+      const voiceLfo = ctx.createOscillator();
+      const voiceLfoGain = ctx.createGain();
+      voiceLfo.frequency.value = 0.03 + d * 0.017;
+      voiceLfoGain.gain.value = 0.02;
+      voiceLfo.connect(voiceLfoGain);
+      voiceLfoGain.connect(g.gain);
+      voiceLfo.start();
+      osc.connect(g);
+      g.connect(master);
+      osc.start();
+    }
+  }
+
+  // Very soft reverb-like texture (filtered noise)
+  const bufferSize = ctx.sampleRate * 2;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let b = 0;
+  for (let i = 0; i < bufferSize; i++) {
+    const w = Math.random() * 2 - 1;
+    b = 0.998 * b + w * 0.002;
+    data[i] = b * 20;
+  }
+  const texSource = ctx.createBufferSource();
+  texSource.buffer = buffer;
+  texSource.loop = true;
+  const texFilter = ctx.createBiquadFilter();
+  texFilter.type = "lowpass";
+  texFilter.frequency.value = 300;
+  const texGain = ctx.createGain();
+  texGain.gain.value = 0.15;
+  texSource.connect(texFilter);
+  texFilter.connect(texGain);
+  texGain.connect(master);
+  texSource.start();
+
+  return master;
+}
+
 function startProceduralAudio(
   type: Track["procedural"],
   vol: number,
@@ -237,6 +474,9 @@ function startProceduralAudio(
   if (type === "rain") node = createRainNode(ctx);
   else if (type === "nature") node = createNatureNode(ctx);
   else if (type === "focus") node = createFocusNode(ctx);
+  else if (type === "lofi-cafe") node = createLofiCafeNode(ctx);
+  else if (type === "lofi-rain") node = createLofiRainNode(ctx);
+  else if (type === "lofi-dreams") node = createLofiDreamsNode(ctx);
   else node = createWhiteNoiseNode(ctx);
 
   node.connect(masterGain);
@@ -282,7 +522,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   isLoopingRef.current = isLooping;
   isPlayingRef.current = isPlaying;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs only on track change
   useEffect(() => {
     if (currentTrack.procedural) return;
     if (!audioRef.current) audioRef.current = new Audio();

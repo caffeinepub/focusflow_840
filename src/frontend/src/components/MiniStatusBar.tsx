@@ -31,61 +31,79 @@ export function MiniStatusBar({
         <motion.div
           key="mini-bar"
           data-ocid="mini_status_bar.panel"
-          className="fixed bottom-0 left-0 right-0 z-50 lg:left-0"
-          initial={{ y: 80, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 80, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          initial={{ y: 80, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 80, opacity: 0, scale: 0.9 }}
+          transition={{
+            type: "spring",
+            stiffness: 320,
+            damping: 30,
+            mass: 0.8,
+          }}
         >
-          {/* Progress bar at very top of bar */}
-          {showTimer && (
-            <div
-              className="h-0.5 w-full"
-              style={{ background: "oklch(0.15 0.03 265)" }}
-            >
-              <motion.div
-                className="h-full"
-                style={{
-                  background:
-                    "linear-gradient(90deg, oklch(0.62 0.24 270), oklch(0.7 0.15 210))",
-                  boxShadow: "0 0 8px oklch(0.62 0.24 270 / 0.6)",
-                }}
-                animate={{ width: `${100 - pct}%` }}
-                transition={{ duration: 0.5, ease: "linear" }}
-              />
-            </div>
-          )}
-
           <div
-            className="flex items-center gap-3 px-4 py-2.5"
+            className="relative flex items-center gap-2 px-4 py-2.5 rounded-full"
             style={{
-              background: "oklch(0.11 0.025 265 / 0.97)",
-              backdropFilter: "blur(20px)",
-              borderTop: "1px solid oklch(0.25 0.04 265 / 0.6)",
+              background: "oklch(0.11 0.020 255 / 0.92)",
+              backdropFilter: "blur(28px) saturate(160%)",
+              WebkitBackdropFilter: "blur(28px) saturate(160%)",
+              border: "1px solid oklch(0.72 0.17 162 / 0.25)",
+              boxShadow:
+                "0 8px 40px oklch(0 0 0 / 0.55), 0 0 0 0.5px oklch(1 0 0 / 0.04), inset 0 1px 0 oklch(1 0 0 / 0.07), 0 0 20px oklch(0.72 0.17 162 / 0.12)",
             }}
           >
-            {/* Timer pill */}
+            {/* Gradient border top edge */}
+            <div
+              className="absolute top-0 left-8 right-8 h-px rounded-full pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, oklch(0.72 0.17 162 / 0.5), oklch(0.78 0.16 75 / 0.3), transparent)",
+              }}
+            />
+
+            {/* Progress arc — thin ring around the pill */}
+            {showTimer && (
+              <div
+                className="absolute inset-0 rounded-full pointer-events-none overflow-hidden"
+                style={{ opacity: 0.25 }}
+              >
+                <motion.div
+                  className="absolute bottom-0 left-0 h-0.5 rounded-full"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, oklch(0.72 0.17 162), oklch(0.78 0.16 75))",
+                    boxShadow: "0 0 6px oklch(0.72 0.17 162)",
+                  }}
+                  animate={{ width: `${100 - pct}%` }}
+                  transition={{ duration: 0.5, ease: "linear" }}
+                />
+              </div>
+            )}
+
+            {/* Timer section */}
             {showTimer && (
               <motion.button
                 type="button"
                 onClick={onGoToTimer}
                 data-ocid="mini_status_bar.timer_button"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors hover:bg-white/8 cursor-pointer"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2 px-2 py-1 rounded-full transition-colors hover:bg-white/8 cursor-pointer"
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
               >
                 <Timer
                   className="w-3.5 h-3.5 flex-shrink-0"
-                  style={{ color: "oklch(0.62 0.24 270)" }}
+                  style={{ color: "oklch(0.72 0.17 162)" }}
                 />
                 <span
-                  className="font-display font-bold tabular-nums text-sm tracking-wider"
+                  className="font-mono font-bold tabular-nums text-sm tracking-wider"
                   style={{
+                    fontFamily: "'JetBrains Mono', 'Geist Mono', monospace",
                     color: running
-                      ? "oklch(0.92 0.015 260)"
-                      : "oklch(0.6 0.05 265)",
+                      ? "oklch(0.94 0.008 255)"
+                      : "oklch(0.55 0.018 255)",
                     filter: running
-                      ? "drop-shadow(0 0 6px oklch(0.62 0.24 270 / 0.5))"
+                      ? "drop-shadow(0 0 6px oklch(0.72 0.17 162 / 0.6))"
                       : "none",
                   }}
                 >
@@ -93,14 +111,14 @@ export function MiniStatusBar({
                   {String(seconds).padStart(2, "0")}
                 </span>
                 <span
-                  className="text-[10px] tracking-widest uppercase font-medium"
+                  className="text-[10px] tracking-widest uppercase font-medium hidden sm:block"
                   style={{
                     color: running
-                      ? "oklch(0.62 0.24 270)"
-                      : "oklch(0.45 0.04 265)",
+                      ? "oklch(0.72 0.17 162)"
+                      : "oklch(0.42 0.018 255)",
                   }}
                 >
-                  {running ? "Focusing" : "Paused"}
+                  {running ? "Focus" : "Paused"}
                 </span>
               </motion.button>
             )}
@@ -108,24 +126,23 @@ export function MiniStatusBar({
             {/* Divider */}
             {showTimer && showMusic && (
               <div
-                className="w-px h-6 flex-shrink-0"
-                style={{ background: "oklch(0.25 0.04 265 / 0.5)" }}
+                className="w-px h-5 flex-shrink-0"
+                style={{ background: "oklch(0.72 0.17 162 / 0.25)" }}
               />
             )}
 
-            {/* Music pill */}
+            {/* Music section */}
             {showMusic && (
               <motion.div
-                className="flex items-center gap-2 flex-1 min-w-0"
+                className="flex items-center gap-2"
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                {/* Animated mini bars */}
                 <button
                   type="button"
                   onClick={onGoToMusic}
                   data-ocid="mini_status_bar.music_button"
-                  className="flex items-center gap-2 min-w-0 flex-1 hover:bg-white/5 rounded-lg px-2 py-1 transition-colors"
+                  className="flex items-center gap-2 hover:bg-white/6 rounded-full px-2 py-1 transition-colors"
                 >
                   <div className="flex items-end gap-0.5 h-4 flex-shrink-0">
                     {[1, 2, 3].map((b) => (
@@ -143,19 +160,18 @@ export function MiniStatusBar({
                       />
                     ))}
                   </div>
-                  <span className="text-xs font-medium text-foreground/80 truncate">
+                  <span className="text-xs font-medium text-foreground/75 hidden sm:block truncate max-w-[100px]">
                     {currentTrack.emoji} {currentTrack.name}
                   </span>
                 </button>
 
-                {/* Mini controls */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-0.5">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={togglePlay}
                     data-ocid="mini_status_bar.play_pause_button"
-                    className="h-8 w-8 p-0 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                    className="h-7 w-7 p-0 rounded-full hover:bg-white/12 text-muted-foreground hover:text-foreground transition-all"
                   >
                     {isPlaying ? (
                       <Pause className="w-3.5 h-3.5" />
@@ -168,7 +184,7 @@ export function MiniStatusBar({
                     size="sm"
                     onClick={skipNext}
                     data-ocid="mini_status_bar.skip_button"
-                    className="h-8 w-8 p-0 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                    className="h-7 w-7 p-0 rounded-full hover:bg-white/12 text-muted-foreground hover:text-foreground transition-all"
                   >
                     <SkipForward className="w-3.5 h-3.5" />
                   </Button>

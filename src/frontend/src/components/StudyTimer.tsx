@@ -208,6 +208,23 @@ export function StudyTimer() {
                   marginLeft: -150,
                 }}
               />
+              {/* Expand rings */}
+              {([0, 0.8, 1.6] as const).map((delay) => (
+                <div
+                  key={`expand-ring-${delay}`}
+                  className="absolute pointer-events-none rounded-full"
+                  style={{
+                    border: "2px solid oklch(0.72 0.17 162 / 0.4)",
+                    top: "50%",
+                    left: "50%",
+                    width: 260,
+                    height: 260,
+                    marginTop: -130,
+                    marginLeft: -130,
+                    animation: `expand-ring 2.4s ease-out ${delay}s infinite`,
+                  }}
+                />
+              ))}
             </>
           )}
 

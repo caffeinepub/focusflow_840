@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { CheckSquare, Clock, ListTodo, Plus, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type Filter = "all" | "active" | "completed";
@@ -64,9 +64,23 @@ interface SparkleGroup {
 export function TodoList() {
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [tasks, setTasks] = useState<LocalTask[]>([]);
+  const [tasks, setTasks] = useState<LocalTask[]>(() => {
+    try {
+      const raw = localStorage.getItem("focusflow_todos");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const [sparkleGroups, setSparkleGroups] = useState<SparkleGroup[]>([]);
   const sparkleIdRef = useRef(0);
+  useEffect(() => {
+    try {
+      localStorage.setItem("focusflow_todos", JSON.stringify(tasks));
+    } catch {}
+  }, [tasks]);
 
   function triggerSparkle(taskId: string, x: number, y: number) {
     const id = ++sparkleIdRef.current;

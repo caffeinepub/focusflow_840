@@ -16,9 +16,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Outfit", "system-ui", "sans-serif"],
-        display: ["Sora", "system-ui", "sans-serif"],
-        mono: ["Geist Mono", "monospace"],
+        sans: ["Satoshi", "Outfit", "system-ui", "sans-serif"],
+        display: ["Bricolage Grotesque", "Sora", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "Geist Mono", "monospace"],
       },
       colors: {
         border: "oklch(var(--border))",
@@ -82,10 +82,11 @@ export default {
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgba(0,0,0,0.1)",
-        glow: "0 0 30px oklch(0.62 0.24 270 / 0.35), 0 0 60px oklch(0.62 0.24 270 / 0.1)",
-        "glow-cyan": "0 0 30px oklch(0.7 0.15 210 / 0.3)",
-        "glow-emerald": "0 0 30px oklch(0.7 0.18 145 / 0.3)",
-        glass: "0 8px 32px 0 rgba(0,0,0,0.5), inset 0 1px 0 oklch(1 0 0 / 0.05)",
+        glow: "0 0 30px oklch(0.72 0.17 162 / 0.35), 0 0 60px oklch(0.72 0.17 162 / 0.12)",
+        "glow-amber": "0 0 30px oklch(0.78 0.16 75 / 0.32), 0 0 60px oklch(0.78 0.16 75 / 0.12)",
+        "glow-cyan": "0 0 30px oklch(0.70 0.15 210 / 0.30)",
+        "glow-emerald": "0 0 30px oklch(0.72 0.17 162 / 0.32)",
+        glass: "0 8px 32px 0 rgba(0,0,0,0.55), inset 0 1px 0 oklch(1 0 0 / 0.05)",
       },
       keyframes: {
         "accordion-down": {
@@ -108,13 +109,24 @@ export default {
           from: { backgroundPosition: "-200% 0" },
           to: { backgroundPosition: "200% 0" },
         },
+        "spring-pop": {
+          "0%": { transform: "scale(0.9)", opacity: "0" },
+          "60%": { transform: "scale(1.04)", opacity: "1" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "0.5" },
+          "50%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in-up": "fade-in-up 0.4s ease-out forwards",
+        "fade-in-up": "fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         "fade-in": "fade-in 0.3s ease-out forwards",
         shimmer: "shimmer 2s linear infinite",
+        "spring-pop": "spring-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        "glow-pulse": "glow-pulse 2.5s ease-in-out infinite",
       },
     },
   },

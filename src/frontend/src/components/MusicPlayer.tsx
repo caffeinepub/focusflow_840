@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { TRACKS, useMusic } from "@/contexts/MusicContext";
+import { LOFI_IDS, TRACKS, useMusic } from "@/contexts/MusicContext";
 import {
   Music2,
   Pause,
@@ -30,6 +30,31 @@ export function MusicPlayer() {
     skipNext,
     skipPrev,
   } = useMusic();
+
+  // Build track list with injected category label separators
+  const trackListItems: Array<
+    | { type: "label"; label: string }
+    | { type: "track"; track: (typeof TRACKS)[0]; trackIdx: number }
+  > = [];
+  let lofiLabelAdded = false;
+  let ambientLabelAdded = false;
+  let trackCounter = 0;
+
+  for (const track of TRACKS) {
+    if (LOFI_IDS.has(track.id)) {
+      if (!lofiLabelAdded) {
+        trackListItems.push({ type: "label", label: "LOFI" });
+        lofiLabelAdded = true;
+      }
+    } else {
+      if (!ambientLabelAdded) {
+        trackListItems.push({ type: "label", label: "AMBIENT" });
+        ambientLabelAdded = true;
+      }
+    }
+    trackCounter++;
+    trackListItems.push({ type: "track", track, trackIdx: trackCounter });
+  }
 
   return (
     <div className="p-6 space-y-5 max-w-2xl mx-auto">
@@ -278,83 +303,96 @@ export function MusicPlayer() {
           </div>
           <span className="section-label text-muted-foreground">Playlist</span>
         </div>
-        {TRACKS.map((track, idx) => (
-          <motion.button
-            key={track.id}
-            type="button"
-            onClick={() => selectTrack(track)}
-            data-ocid={`music.track.item.${idx + 1}`}
-            className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 text-left ${
-              currentTrack.id === track.id
-                ? "bg-white/8 border border-white/10"
-                : "hover:bg-white/4 border border-transparent"
-            }`}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 + idx * 0.07, ease: "easeOut" }}
-            whileHover={{ x: 4 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <motion.span
-              className="text-xl leading-none"
-              animate={
-                currentTrack.id === track.id && isPlaying
-                  ? { scale: [1, 1.15, 1] }
-                  : { scale: 1 }
-              }
-              transition={{
-                duration: 1.5,
-                repeat:
-                  currentTrack.id === track.id && isPlaying
-                    ? Number.POSITIVE_INFINITY
-                    : 0,
-                ease: "easeInOut",
-              }}
-            >
-              {track.emoji}
-            </motion.span>
-            <div className="flex-1 min-w-0">
+        {trackListItems.map((item, listIdx) => {
+          if (item.type === "label") {
+            return (
               <div
-                className={`text-sm font-semibold truncate transition-colors ${
-                  currentTrack.id === track.id
-                    ? "text-foreground"
-                    : "text-foreground/70"
-                }`}
+                key={`label-${item.label}`}
+                className="text-xs text-muted-foreground/60 uppercase tracking-widest px-3 py-1 mt-2"
               >
-                {track.name}
+                {item.label}
               </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {track.subtitle}
+            );
+          }
+          const { track, trackIdx } = item;
+          return (
+            <motion.button
+              key={track.id}
+              type="button"
+              onClick={() => selectTrack(track)}
+              data-ocid={`music.track.item.${trackIdx}`}
+              className={`shimmer-card w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 text-left ${
+                currentTrack.id === track.id
+                  ? "bg-white/8 border border-white/10"
+                  : "hover:bg-white/4 border border-transparent"
+              }`}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + listIdx * 0.05, ease: "easeOut" }}
+              whileHover={{ x: 4 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <motion.span
+                className="text-xl leading-none"
+                animate={
+                  currentTrack.id === track.id && isPlaying
+                    ? { scale: [1, 1.15, 1] }
+                    : { scale: 1 }
+                }
+                transition={{
+                  duration: 1.5,
+                  repeat:
+                    currentTrack.id === track.id && isPlaying
+                      ? Number.POSITIVE_INFINITY
+                      : 0,
+                  ease: "easeInOut",
+                }}
+              >
+                {track.emoji}
+              </motion.span>
+              <div className="flex-1 min-w-0">
+                <div
+                  className={`text-sm font-semibold truncate transition-colors ${
+                    currentTrack.id === track.id
+                      ? "text-foreground"
+                      : "text-foreground/70"
+                  }`}
+                >
+                  {track.name}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {track.subtitle}
+                </div>
               </div>
-            </div>
-            {/* Active indicator */}
-            {currentTrack.id === track.id && (
-              <div className="flex items-end gap-0.5 h-4 flex-shrink-0">
-                {isPlaying ? (
-                  [1, 2, 3].map((b) => (
-                    <motion.div
-                      key={b}
-                      className="w-1 rounded-full"
+              {/* Active indicator */}
+              {currentTrack.id === track.id && (
+                <div className="flex items-end gap-0.5 h-4 flex-shrink-0">
+                  {isPlaying ? (
+                    [1, 2, 3].map((b) => (
+                      <motion.div
+                        key={b}
+                        className="w-1 rounded-full"
+                        style={{ background: track.accentColor }}
+                        animate={{ height: ["4px", "14px", "4px"] }}
+                        transition={{
+                          duration: 0.7,
+                          repeat: Number.POSITIVE_INFINITY,
+                          delay: b * 0.15,
+                          ease: "easeInOut",
+                        }}
+                      />
+                    ))
+                  ) : (
+                    <div
+                      className="w-1.5 h-1.5 rounded-full"
                       style={{ background: track.accentColor }}
-                      animate={{ height: ["4px", "14px", "4px"] }}
-                      transition={{
-                        duration: 0.7,
-                        repeat: Number.POSITIVE_INFINITY,
-                        delay: b * 0.15,
-                        ease: "easeInOut",
-                      }}
                     />
-                  ))
-                ) : (
-                  <div
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: track.accentColor }}
-                  />
-                )}
-              </div>
-            )}
-          </motion.button>
-        ))}
+                  )}
+                </div>
+              )}
+            </motion.button>
+          );
+        })}
       </motion.div>
     </div>
   );
