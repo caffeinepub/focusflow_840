@@ -14,6 +14,33 @@ import { toast } from "sonner";
 
 const WATER_INTERVAL_MS = 30 * 60 * 1000;
 
+function playCompletionSound() {
+  try {
+    const ctx = new AudioContext();
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18);
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
+      gain.gain.linearRampToValueAtTime(
+        0.35,
+        ctx.currentTime + i * 0.18 + 0.05,
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        ctx.currentTime + i * 0.18 + 0.5,
+      );
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.55);
+    });
+    setTimeout(() => ctx.close(), 2500);
+  } catch (_) {}
+}
+
 export interface TimerContextValue {
   totalSeconds: number;
   remaining: number;
@@ -67,6 +94,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleComplete = useCallback(() => {
+    playCompletionSound();
     clearTimers();
     setRunning(false);
     setRemaining(0);
