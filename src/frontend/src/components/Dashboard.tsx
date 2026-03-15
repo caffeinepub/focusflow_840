@@ -5,18 +5,25 @@ import {
   BookOpen,
   Clock,
   Droplets,
-  Flame,
   History,
   Quote,
   RefreshCw,
   Timer,
   User,
 } from "lucide-react";
-import { motion, useInView, useMotionValue, useSpring } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useMotionValue,
+  useSpring,
+} from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetRandomQuote } from "../hooks/useQueries";
 import { useSessionHistory } from "../hooks/useSessionHistory";
+import { LiveClock } from "./LiveClock";
+import { TiltCard } from "./TiltCard";
 
 interface DashboardProps {
   onStartTimer: () => void;
@@ -274,192 +281,207 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
             <TypewriterText text="Welcome back! 👋" />
           </h1>
           <p className="text-muted-foreground mt-2 text-sm tracking-wide">
-            Good to see you. Let’s make today count.
+            Good to see you. Let&apos;s make today count.
           </p>
         </div>
-        {shortPrincipal && (
-          <motion.div
-            className="glass-card rounded-xl px-3 py-2 flex items-center gap-2 flex-shrink-0 mt-1"
-            whileHover={{ scale: 1.02, y: -1 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-          >
-            <User className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs text-muted-foreground font-mono">
-              {shortPrincipal}
-            </span>
-          </motion.div>
-        )}
+
+        {/* Right side: clock + optional principal */}
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <LiveClock />
+          {shortPrincipal && (
+            <motion.div
+              className="glass-card rounded-xl px-3 py-1.5 flex items-center gap-2"
+              whileHover={{ scale: 1.02, y: -1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            >
+              <User className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs text-muted-foreground font-mono">
+                {shortPrincipal}
+              </span>
+            </motion.div>
+          )}
+        </div>
       </motion.div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Streak */}
-        <motion.div
-          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
-          custom={0}
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          whileHover={{
-            y: -4,
-            transition: { type: "spring", stiffness: 380, damping: 22 },
-          }}
-        >
+        <TiltCard maxTilt={7}>
           <motion.div
-            className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: "oklch(0.78 0.16 75 / 0.12)",
-              border: "1px solid oklch(0.78 0.16 75 / 0.25)",
-              boxShadow: "0 0 24px oklch(0.78 0.16 75 / 0.22)",
-            }}
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{
-              duration: 3,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "easeInOut",
+            className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
+            custom={0}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover={{
+              y: -4,
+              transition: { type: "spring", stiffness: 380, damping: 22 },
             }}
           >
-            <span className="animate-flame-dance text-2xl select-none">🔥</span>
+            <motion.div
+              className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "oklch(0.78 0.16 75 / 0.12)",
+                border: "1px solid oklch(0.78 0.16 75 / 0.25)",
+                boxShadow: "0 0 24px oklch(0.78 0.16 75 / 0.22)",
+              }}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{
+                duration: 3,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+              }}
+            >
+              <span className="animate-flame-dance text-2xl select-none">
+                🔥
+              </span>
+            </motion.div>
+            <div className="relative z-10">
+              <div className="section-label text-muted-foreground mb-1">
+                Day Streak
+              </div>
+              <div className="flex items-baseline gap-1">
+                <AnimatedNumber
+                  value={streakVal}
+                  className="text-3xl font-display font-bold text-gradient-orange tabular-nums"
+                />
+                <span className="text-xs text-muted-foreground">days</span>
+              </div>
+            </div>
           </motion.div>
-          <div className="relative z-10">
-            <div className="section-label text-muted-foreground mb-1">
-              Day Streak
-            </div>
-            <div className="flex items-baseline gap-1">
-              <AnimatedNumber
-                value={streakVal}
-                className="text-3xl font-display font-bold text-gradient-orange tabular-nums"
-              />
-              <span className="text-xs text-muted-foreground">days</span>
-            </div>
-          </div>
-        </motion.div>
+        </TiltCard>
 
         {/* Today's sessions */}
-        <motion.div
-          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
-          custom={1}
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          whileHover={{
-            y: -4,
-            transition: { type: "spring", stiffness: 380, damping: 22 },
-          }}
-        >
+        <TiltCard maxTilt={7}>
           <motion.div
-            className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: "oklch(0.72 0.17 162 / 0.12)",
-              border: "1px solid oklch(0.72 0.17 162 / 0.25)",
-              boxShadow: "0 0 24px oklch(0.72 0.17 162 / 0.22)",
+            className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
+            custom={1}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover={{
+              y: -4,
+              transition: { type: "spring", stiffness: 380, damping: 22 },
             }}
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            transition={{ type: "spring", stiffness: 400, damping: 15 }}
           >
-            <BookOpen className="w-6 h-6 text-primary" />
-          </motion.div>
-          <div className="relative z-10">
-            <div className="section-label text-muted-foreground mb-1">
-              Today’s Sessions
-            </div>
-            <div className="flex items-baseline gap-1">
-              <AnimatedNumber
-                value={sessionsVal}
-                className="text-3xl font-display font-bold text-gradient-primary tabular-nums"
-              />
-              <span className="text-xs text-muted-foreground">done</span>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Studied Today — with circular progress ring */}
-        <motion.div
-          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
-          custom={2}
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          whileHover={{
-            y: -4,
-            transition: { type: "spring", stiffness: 380, damping: 22 },
-          }}
-        >
-          <div className="relative flex-shrink-0">
-            <CircularProgress
-              pct={studyPct}
-              size={52}
-              stroke={3}
-              color="oklch(0.72 0.17 162)"
-              trackColor="oklch(0.72 0.17 162 / 0.12)"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Timer
-                className="w-5 h-5"
-                style={{ color: "oklch(0.72 0.17 162)" }}
-              />
-            </div>
-          </div>
-          <div className="relative z-10 min-w-0">
-            <div className="section-label text-muted-foreground mb-1">
-              Studied Today
-            </div>
             <motion.div
-              key={todayMinutes}
-              initial={{ opacity: 0, scale: 0.88 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
-              className="text-xl font-display font-bold text-gradient-primary"
+              className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "oklch(0.72 0.17 162 / 0.12)",
+                border: "1px solid oklch(0.72 0.17 162 / 0.25)",
+                boxShadow: "0 0 24px oklch(0.72 0.17 162 / 0.22)",
+              }}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400, damping: 15 }}
             >
-              {formatStudyTime(todayMinutes)}
+              <BookOpen className="w-6 h-6 text-primary" />
             </motion.div>
-            <div className="text-[10px] text-muted-foreground/50 mt-0.5">
-              Goal: 2h
+            <div className="relative z-10">
+              <div className="section-label text-muted-foreground mb-1">
+                Today's Sessions
+              </div>
+              <div className="flex items-baseline gap-1">
+                <AnimatedNumber
+                  value={sessionsVal}
+                  className="text-3xl font-display font-bold text-gradient-primary tabular-nums"
+                />
+                <span className="text-xs text-muted-foreground">done</span>
+              </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </TiltCard>
+
+        {/* Studied Today */}
+        <TiltCard maxTilt={7}>
+          <motion.div
+            className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
+            custom={2}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover={{
+              y: -4,
+              transition: { type: "spring", stiffness: 380, damping: 22 },
+            }}
+          >
+            <div className="relative flex-shrink-0">
+              <CircularProgress
+                pct={studyPct}
+                size={52}
+                stroke={3}
+                color="oklch(0.72 0.17 162)"
+                trackColor="oklch(0.72 0.17 162 / 0.12)"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Timer
+                  className="w-5 h-5"
+                  style={{ color: "oklch(0.72 0.17 162)" }}
+                />
+              </div>
+            </div>
+            <div className="relative z-10 min-w-0">
+              <div className="section-label text-muted-foreground mb-1">
+                Studied Today
+              </div>
+              <motion.div
+                key={todayMinutes}
+                initial={{ opacity: 0, scale: 0.88 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
+                className="text-xl font-display font-bold text-gradient-primary"
+              >
+                {formatStudyTime(todayMinutes)}
+              </motion.div>
+              <div className="text-[10px] text-muted-foreground/50 mt-0.5">
+                Goal: 2h
+              </div>
+            </div>
+          </motion.div>
+        </TiltCard>
 
         {/* Water reminder */}
-        <motion.div
-          className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
-          custom={3}
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          whileHover={{
-            y: -4,
-            transition: { type: "spring", stiffness: 380, damping: 22 },
-          }}
-        >
+        <TiltCard maxTilt={7}>
           <motion.div
-            className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: "oklch(0.70 0.15 210 / 0.12)",
-              border: "1px solid oklch(0.70 0.15 210 / 0.25)",
-              boxShadow: "0 0 24px oklch(0.70 0.15 210 / 0.22)",
-            }}
-            animate={{ scale: [1, 1.04, 1] }}
-            transition={{
-              duration: 4,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "easeInOut",
-              delay: 1.5,
+            className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
+            custom={3}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover={{
+              y: -4,
+              transition: { type: "spring", stiffness: 380, damping: 22 },
             }}
           >
-            <Droplets
-              className="w-6 h-6"
-              style={{ color: "oklch(0.80 0.15 205)" }}
-            />
+            <motion.div
+              className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "oklch(0.70 0.15 210 / 0.12)",
+                border: "1px solid oklch(0.70 0.15 210 / 0.25)",
+                boxShadow: "0 0 24px oklch(0.70 0.15 210 / 0.22)",
+              }}
+              animate={{ scale: [1, 1.04, 1] }}
+              transition={{
+                duration: 4,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+                delay: 1.5,
+              }}
+            >
+              <Droplets
+                className="w-6 h-6"
+                style={{ color: "oklch(0.80 0.15 205)" }}
+              />
+            </motion.div>
+            <div className="relative z-10">
+              <div className="section-label text-muted-foreground mb-1">
+                Hydration
+              </div>
+              <div className="text-lg font-display font-bold text-gradient-cyan">
+                {formatWaterReminder()}
+              </div>
+            </div>
           </motion.div>
-          <div className="relative z-10">
-            <div className="section-label text-muted-foreground mb-1">
-              Hydration
-            </div>
-            <div className="text-lg font-display font-bold text-gradient-cyan">
-              {formatWaterReminder()}
-            </div>
-          </div>
-        </motion.div>
+        </TiltCard>
       </div>
 
       {/* Quote + Quick Start */}
@@ -484,7 +506,7 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
               transform: "translate(30%, -30%)",
             }}
           />
-          {/* Decorative left border gradient line */}
+          {/* Left accent bar */}
           <div
             className="absolute left-0 top-6 bottom-6 w-0.5 rounded-full"
             style={{
@@ -531,18 +553,22 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
               <Skeleton className="h-4 w-3/4" />
             </div>
           ) : (
-            <motion.p
-              key={quote}
-              initial={{ opacity: 0, y: 10, scale: 0.99 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-              className="text-foreground/90 text-base leading-relaxed relative pl-3"
-              style={{ fontStyle: "italic" }}
-            >
-              &ldquo;
-              {quote ?? "The secret of getting ahead is getting started."}
-              &rdquo;
-            </motion.p>
+            // ── Cinematic blur-fade quote reveal ──
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={quote}
+                initial={{ opacity: 0, filter: "blur(8px)", scale: 0.97, y: 6 }}
+                animate={{ opacity: 1, filter: "blur(0px)", scale: 1, y: 0 }}
+                exit={{ opacity: 0, filter: "blur(8px)", scale: 0.97, y: -6 }}
+                transition={{ duration: 0.52, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="text-foreground/90 text-base leading-relaxed relative pl-3"
+                style={{ fontStyle: "italic" }}
+              >
+                &ldquo;
+                {quote ?? "The secret of getting ahead is getting started."}
+                &rdquo;
+              </motion.p>
+            </AnimatePresence>
           )}
         </motion.div>
 

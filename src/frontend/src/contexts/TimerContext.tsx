@@ -45,10 +45,17 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [customMinutes, setCustomMinutes] = useState("25");
   const [customSeconds, setCustomSeconds] = useState("0");
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const waterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Always-current refs — safe to read inside effects without adding to dep arrays
+  const remainingRef = useRef(remaining);
+  remainingRef.current = remaining;
   const totalSecondsRef = useRef(totalSeconds);
   totalSecondsRef.current = totalSeconds;
+
+  // Timestamp-based tracking so background-tab throttling has no effect
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const waterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number | null>(null); // wall-clock ms when timer last (re)started
+  const startRemainingRef = useRef<number>(remaining); // remaining seconds at that moment
 
   const { mutate: completeSession } = useCompleteStudySession();
 
@@ -63,6 +70,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     clearTimers();
     setRunning(false);
     setRemaining(0);
+    startTimeRef.current = null;
     const duration = Math.round(totalSecondsRef.current / 60);
     completeSession(BigInt(duration));
     addSession(duration);
@@ -74,21 +82,54 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     });
   }, [clearTimers, completeSession, addSession]);
 
+  // Recompute remaining from wall clock — used both in interval and visibility handler
+  const syncFromWallClock = useCallback(() => {
+    if (startTimeRef.current === null) return;
+    const elapsedSeconds = Math.floor(
+      (Date.now() - startTimeRef.current) / 1000,
+    );
+    const newRemaining = startRemainingRef.current - elapsedSeconds;
+    if (newRemaining <= 0) {
+      handleComplete();
+    } else {
+      setRemaining(newRemaining);
+    }
+  }, [handleComplete]);
+
   useEffect(() => {
     if (!running) return;
-    intervalRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          handleComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+
+    // Snapshot baseline from the always-current ref — no stale closure issue
+    startTimeRef.current = Date.now();
+    startRemainingRef.current = remainingRef.current;
+
+    // Poll every 500 ms; actual elapsed time comes from the wall clock
+    intervalRef.current = setInterval(syncFromWallClock, 500);
+
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [running, handleComplete]);
+  }, [running, syncFromWallClock]);
+
+  // When paused/reset, keep startRemainingRef in sync so next resume is correct
+  useEffect(() => {
+    if (!running) {
+      startRemainingRef.current = remainingRef.current;
+      startTimeRef.current = null;
+    }
+  }, [running]);
+
+  // Immediately recalculate when the tab becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && running) {
+        syncFromWallClock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [running, syncFromWallClock]);
 
   function startWaterReminder() {
     waterTimerRef.current = setInterval(() => {
@@ -103,8 +144,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   function handleStart() {
     if (!running) {
-      if (remaining === 0) {
+      if (remainingRef.current === 0) {
         setRemaining(totalSeconds);
+        remainingRef.current = totalSeconds;
       }
       startWaterReminder();
     } else {
@@ -117,6 +159,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     clearTimers();
     setRunning(false);
     setRemaining(totalSeconds);
+    remainingRef.current = totalSeconds;
+    startRemainingRef.current = totalSeconds;
+    startTimeRef.current = null;
   }
 
   function handleCustomTime() {
@@ -127,6 +172,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     if (total < 1 || total > 12 * 3600) return;
     setTotalSeconds(total);
     setRemaining(total);
+    remainingRef.current = total;
+    startRemainingRef.current = total;
+    startTimeRef.current = null;
     setRunning(false);
     clearTimers();
   }
@@ -138,6 +186,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     const secs = min * 60;
     setTotalSeconds(secs);
     setRemaining(secs);
+    remainingRef.current = secs;
+    startRemainingRef.current = secs;
+    startTimeRef.current = null;
     setRunning(false);
     clearTimers();
   }
