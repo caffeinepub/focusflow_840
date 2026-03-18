@@ -157,6 +157,7 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
   const queryClient = useQueryClient();
   const { data: quote, isLoading: quoteLoading } = useGetRandomQuote();
   const { sessions, streak, todaySessions, todayMinutes } = useSessionHistory();
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const principal = identity?.getPrincipal().toString();
   const shortPrincipal = principal
@@ -234,6 +235,34 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
   // Daily goal: 2 hours = 120 min
   const dailyGoalMinutes = 120;
   const studyPct = Math.min(100, (todayMinutes / dailyGoalMinutes) * 100);
+
+  // 5-day study history computation
+  const fiveDayData = (() => {
+    const today = new Date();
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const key = `${y}-${mo}-${day}`;
+      const mins = sessions
+        .filter((s) => {
+          const sd = new Date(s.completedAt);
+          const sk = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}-${String(sd.getDate()).padStart(2, "0")}`;
+          return sk === key;
+        })
+        .reduce((sum, s) => sum + s.durationMinutes, 0);
+      const label =
+        i === 0
+          ? "Today"
+          : i === 1
+            ? "Yesterday"
+            : d.toLocaleDateString("en-US", { weekday: "short" });
+      return { key, label, mins };
+    });
+  })();
+  const maxDayMins = Math.max(...fiveDayData.map((d) => d.mins), 1);
 
   const cardVariants = {
     hidden: { opacity: 0, y: 28, scale: 0.96 },
@@ -394,8 +423,9 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
         {/* Studied Today */}
         <TiltCard maxTilt={7}>
           <motion.div
-            className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-default overflow-hidden"
+            className="shimmer-card glass-stat gradient-border noise-overlay rounded-2xl p-5 flex items-center gap-3 cursor-pointer overflow-hidden group"
             custom={2}
+            onClick={() => setShowHistoryModal(true)}
             variants={cardVariants}
             initial="hidden"
             animate="visible"
@@ -420,8 +450,11 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
               </div>
             </div>
             <div className="relative z-10 min-w-0">
-              <div className="section-label text-muted-foreground mb-1">
+              <div className="section-label text-muted-foreground mb-1 flex items-center gap-1.5">
                 Studied Today
+                <span className="opacity-0 group-hover:opacity-60 transition-opacity text-[9px] text-primary">
+                  ▸ history
+                </span>
               </div>
               <motion.div
                 key={todayMinutes}
@@ -723,6 +756,140 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
           </div>
         )}
       </motion.div>
+
+      {/* 5-day study history modal */}
+      <AnimatePresence>
+        {showHistoryModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setShowHistoryModal(false)}
+            data-ocid="dashboard.history.modal"
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+            {/* Modal card */}
+            <motion.div
+              className="relative z-10 w-full max-w-sm rounded-2xl p-6 overflow-hidden"
+              style={{
+                background: "oklch(0.12 0.03 250 / 0.95)",
+                border: "1px solid oklch(0.72 0.17 162 / 0.3)",
+                boxShadow:
+                  "0 0 40px oklch(0.72 0.17 162 / 0.15), 0 20px 60px rgba(0,0,0,0.5)",
+              }}
+              initial={{ opacity: 0, scale: 0.88, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: 16 }}
+              transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Glow orb */}
+              <div
+                className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
+                style={{
+                  background: "oklch(0.72 0.17 162 / 0.12)",
+                  filter: "blur(24px)",
+                }}
+              />
+
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg">
+                    Study History
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Last 5 days
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors text-sm"
+                  data-ocid="dashboard.history.close_button"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3.5">
+                {fiveDayData.map((day, i) => (
+                  <motion.div
+                    key={day.key}
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{
+                      delay: 0.08 + i * 0.06,
+                      duration: 0.35,
+                      ease: [0.34, 1.56, 0.64, 1],
+                    }}
+                    className="flex items-center gap-3"
+                    data-ocid={`dashboard.history.item.${i + 1}`}
+                  >
+                    <div className="w-20 flex-shrink-0">
+                      <span
+                        className={`text-xs font-medium ${i === 0 ? "text-primary" : "text-muted-foreground"}`}
+                      >
+                        {day.label}
+                      </span>
+                    </div>
+                    <div className="flex-1 relative h-5 flex items-center">
+                      <div
+                        className="absolute inset-0 rounded-full overflow-hidden"
+                        style={{ background: "oklch(0.72 0.17 162 / 0.08)" }}
+                      >
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{
+                            background:
+                              i === 0
+                                ? "linear-gradient(90deg, oklch(0.72 0.17 162), oklch(0.75 0.2 200))"
+                                : "linear-gradient(90deg, oklch(0.72 0.17 162 / 0.6), oklch(0.75 0.2 200 / 0.6))",
+                            boxShadow:
+                              i === 0
+                                ? "0 0 10px oklch(0.72 0.17 162 / 0.5)"
+                                : "none",
+                          }}
+                          initial={{ width: "0%" }}
+                          animate={{
+                            width: `${day.mins === 0 ? 0 : Math.max(4, (day.mins / maxDayMins) * 100)}%`,
+                          }}
+                          transition={{
+                            delay: 0.15 + i * 0.06,
+                            duration: 0.6,
+                            ease: [0.34, 1.56, 0.64, 1],
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="w-14 flex-shrink-0 text-right">
+                      <span
+                        className={`text-xs font-mono ${day.mins > 0 ? "text-foreground" : "text-muted-foreground/40"}`}
+                      >
+                        {formatStudyTime(day.mins)}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-border/30">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>5-day total</span>
+                  <span className="text-foreground font-semibold font-mono">
+                    {formatStudyTime(
+                      fiveDayData.reduce((s, d) => s + d.mins, 0),
+                    )}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
