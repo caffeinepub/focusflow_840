@@ -25,6 +25,7 @@ import { MusicPlayer } from "./components/MusicPlayer";
 import { ParticleField } from "./components/ParticleField";
 import { StudyTimer } from "./components/StudyTimer";
 import { TodoList } from "./components/TodoList";
+import { WeeklyReportModal } from "./components/WeeklyReportModal";
 import { Whiteboard } from "./components/Whiteboard";
 
 type Tab =
@@ -145,6 +146,9 @@ function AppInner() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Weekly report modal — checks localStorage and auto-shows after 7 days */}
+      <WeeklyReportModal />
+
       {/* Particle network background */}
       <ParticleField />
       {/* Cursor trail */}

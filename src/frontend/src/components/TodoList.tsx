@@ -244,7 +244,7 @@ export function TodoList() {
 
       {/* Add task */}
       <motion.div
-        className="glass-card rounded-2xl p-5"
+        className="glass-card card-glow-amber rounded-2xl p-5"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.4 }}

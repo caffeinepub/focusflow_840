@@ -77,7 +77,7 @@ export function MusicPlayer() {
       <AnimatePresence mode="wait">
         <motion.div
           key={currentTrack.id}
-          className="glass-elevated rounded-3xl overflow-hidden"
+          className="glass-elevated card-glow-purple rounded-3xl overflow-hidden"
           initial={{ opacity: 0, y: 16, scale: 0.96 }}
           animate={{
             opacity: 1,
