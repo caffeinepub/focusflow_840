@@ -70,6 +70,8 @@ export interface TimerContextValue {
   // --- shared ---
   sessions: ReturnType<typeof useSessionHistory>["sessions"];
   clearSessions: () => void;
+  // --- half-time signal ---
+  halfTimeFired: boolean;
 }
 
 const TimerContext = createContext<TimerContextValue | null>(null);
@@ -85,6 +87,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [customHours, setCustomHours] = useState("0");
   const [customMinutes, setCustomMinutes] = useState("25");
   const [customSeconds, setCustomSeconds] = useState("0");
+  const [halfTimeFired, setHalfTimeFired] = useState(false);
 
   // --- Stopwatch state ---
   const [swElapsed, setSwElapsed] = useState(0);
@@ -106,6 +109,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const startTimeRef = useRef<number | null>(null);
   const startRemainingRef = useRef<number>(remaining);
   const halfTimeFiredRef = useRef(false);
+  const halfTimeFiredStateTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   const clearTimers = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -149,6 +155,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         !halfTimeFiredRef.current
       ) {
         halfTimeFiredRef.current = true;
+        setHalfTimeFired(true);
+        if (halfTimeFiredStateTimeoutRef.current)
+          clearTimeout(halfTimeFiredStateTimeoutRef.current);
+        halfTimeFiredStateTimeoutRef.current = setTimeout(
+          () => setHalfTimeFired(false),
+          9000,
+        );
         toast("⚡ Halfway there!", {
           description:
             "You're doing amazing — push through the second half and finish strong! You've got this! 💪",
@@ -334,6 +347,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         swHandleReset,
         sessions,
         clearSessions,
+        halfTimeFired,
       }}
     >
       {children}

@@ -14,6 +14,7 @@ import {
   Wind,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import React from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AIAssistant } from "./components/AIAssistant";
@@ -23,6 +24,7 @@ import { Meditation } from "./components/Meditation";
 import { MiniStatusBar } from "./components/MiniStatusBar";
 import { MusicPlayer } from "./components/MusicPlayer";
 import { ParticleField } from "./components/ParticleField";
+import { StudyBoyScene } from "./components/StudyBoyScene";
 import { StudyTimer } from "./components/StudyTimer";
 import { TodoList } from "./components/TodoList";
 import { WeeklyReportModal } from "./components/WeeklyReportModal";
@@ -86,6 +88,19 @@ const pageTransition = {
   duration: 0.34,
   ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number],
 };
+
+function StudyBoySceneWrapper() {
+  const [isStudy, setIsStudy] = React.useState(
+    () => localStorage.getItem("focusflow_bg_scene") === "study",
+  );
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setIsStudy(localStorage.getItem("focusflow_bg_scene") === "study");
+    }, 800);
+    return () => clearInterval(interval);
+  }, []);
+  return <StudyBoyScene visible={isStudy} />;
+}
 
 function AppInner() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
@@ -151,6 +166,8 @@ function AppInner() {
 
       {/* Particle network background */}
       <ParticleField />
+      {/* Studying boy scene overlay */}
+      <StudyBoySceneWrapper />
       {/* Cursor trail */}
       <CursorTrail />
       {/* Mobile overlay */}
