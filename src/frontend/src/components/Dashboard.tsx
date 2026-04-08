@@ -121,37 +121,6 @@ function CircularProgress({
   );
 }
 
-// Typewriter text component
-function TypewriterText({
-  text,
-  className,
-}: { text: string; className?: string }) {
-  const [displayed, setDisplayed] = useState("");
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    setDisplayed("");
-    setDone(false);
-    let i = 0;
-    const interval = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(interval);
-        setTimeout(() => setDone(true), 800);
-      }
-    }, 48);
-    return () => clearInterval(interval);
-  }, [text]);
-
-  return (
-    <span className={className}>
-      {displayed}
-      {!done && <span className="blink-cursor text-primary ml-0.5">|</span>}
-    </span>
-  );
-}
-
 export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
@@ -307,7 +276,7 @@ export function Dashboard({ onStartTimer, nextWaterReminder }: DashboardProps) {
                 "'Bricolage Grotesque', 'Sora', system-ui, sans-serif",
             }}
           >
-            <TypewriterText text="Welcome back! 👋" />
+            Welcome back! 👋
           </h1>
           <p className="text-muted-foreground mt-2 text-sm tracking-wide">
             Good to see you. Let&apos;s make today count.

@@ -3,8 +3,8 @@ import { Award, Flame, Star, TrendingUp, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
-const FIRST_USE_KEY = "focusflow_first_use";
-const LAST_SHOWN_KEY = "focusflow_weekly_report_last_shown";
+const FIRST_USE_KEY = "focustree_first_use";
+const LAST_SHOWN_KEY = "focustree_weekly_report_last_shown";
 const MS_IN_WEEK = 7 * 24 * 60 * 60 * 1000;
 
 function getWeeklyStats(
@@ -33,7 +33,7 @@ function getAppreciationMessage(totalMinutes: number): string {
     return "Great effort this week! You're building real momentum! 💪";
   if (totalMinutes >= 30)
     return "Nice start! Every minute of focus counts! Keep going! ✨";
-  return "You opened FocusFlow — that's the first step! Let's make next week count! 🚀";
+  return "You opened FocusTree — that's the first step! Let's make next week count! 🚀";
 }
 
 function getMotivationalPush(totalMinutes: number): string {

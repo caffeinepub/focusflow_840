@@ -2,32 +2,34 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { MusicProvider } from "@/contexts/MusicContext";
 import { TimerProvider } from "@/contexts/TimerContext";
+import { useSessionHistory } from "@/hooks/useSessionHistory";
 import {
   BookOpen,
   Bot,
   CheckSquare,
   Droplets,
+  Gamepad2,
   LayoutDashboard,
+  Lock,
   Music,
   PenLine,
   Timer,
   Wind,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import React from "react";
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AIAssistant } from "./components/AIAssistant";
 import { CursorTrail } from "./components/CursorTrail";
 import { Dashboard } from "./components/Dashboard";
+import { GamesSection } from "./components/GamesSection";
 import { Meditation } from "./components/Meditation";
 import { MiniStatusBar } from "./components/MiniStatusBar";
 import { MusicPlayer } from "./components/MusicPlayer";
 import { ParticleField } from "./components/ParticleField";
-import { StudyBoyScene } from "./components/StudyBoyScene";
 import { StudyTimer } from "./components/StudyTimer";
 import { TodoList } from "./components/TodoList";
-import { WeeklyReportModal } from "./components/WeeklyReportModal";
 import { Whiteboard } from "./components/Whiteboard";
 
 type Tab =
@@ -37,7 +39,8 @@ type Tab =
   | "tasks"
   | "meditation"
   | "ai"
-  | "whiteboard";
+  | "whiteboard"
+  | "games";
 
 interface NavItem {
   id: Tab;
@@ -74,6 +77,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: PenLine,
     ocid: "nav.whiteboard.tab",
   },
+  {
+    id: "games",
+    label: "Games",
+    icon: Gamepad2,
+    ocid: "nav.games.tab",
+  },
 ];
 
 const WATER_INTERVAL_MS = 30 * 60 * 1000;
@@ -89,19 +98,6 @@ const pageTransition = {
   ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number],
 };
 
-function StudyBoySceneWrapper() {
-  const [isStudy, setIsStudy] = React.useState(
-    () => localStorage.getItem("focusflow_bg_scene") === "study",
-  );
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setIsStudy(localStorage.getItem("focusflow_bg_scene") === "study");
-    }, 800);
-    return () => clearInterval(interval);
-  }, []);
-  return <StudyBoyScene visible={isStudy} />;
-}
-
 function AppInner() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -114,6 +110,8 @@ function AppInner() {
   const [magneticNav, setMagneticNav] = useState<
     Record<string, { x: number; y: number }>
   >({});
+  const { todayMinutes } = useSessionHistory();
+  const gamesLocked = todayMinutes < 300;
 
   function handleNavMagnet(id: string, e: React.MouseEvent<HTMLButtonElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -161,13 +159,8 @@ function AppInner() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Weekly report modal — checks localStorage and auto-shows after 7 days */}
-      <WeeklyReportModal />
-
       {/* Particle network background */}
       <ParticleField />
-      {/* Studying boy scene overlay */}
-      <StudyBoySceneWrapper />
       {/* Cursor trail */}
       <CursorTrail />
       {/* Mobile overlay */}
@@ -317,7 +310,7 @@ function AppInner() {
                   "'Bricolage Grotesque', 'Sora', system-ui, sans-serif",
               }}
             >
-              Focus<span className="text-gradient-primary">Flow</span>
+              Focus<span className="text-gradient-primary">Tree</span>
             </span>
             <div className="text-[9px] text-muted-foreground/45 tracking-widest uppercase mt-0.5">
               Study Companion
@@ -329,6 +322,7 @@ function AppInner() {
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item, i) => {
             const isActive = activeTab === item.id;
+            const isGamesLocked = item.id === "games" && gamesLocked;
             return (
               <motion.button
                 type="button"
@@ -405,7 +399,34 @@ function AppInner() {
                     }`}
                   />
                 </motion.div>
-                <span className="relative z-10 font-medium">{item.label}</span>
+                <span className="relative z-10 font-medium flex-1">
+                  {item.label}
+                </span>
+
+                {/* NEW badge for games */}
+                {item.id === "games" && (
+                  <span
+                    className="relative z-10 animate-pulse text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5"
+                    style={{
+                      color: "oklch(0.85 0.20 162)",
+                      background: "oklch(0.25 0.12 162 / 0.55)",
+                      boxShadow: "0 0 8px oklch(0.72 0.17 162 / 0.55)",
+                      border: "1px solid oklch(0.72 0.17 162 / 0.35)",
+                    }}
+                  >
+                    NEW
+                  </span>
+                )}
+
+                {/* Lock badge for games */}
+                {isGamesLocked && (
+                  <span
+                    className="relative z-10 flex items-center"
+                    title="Study 5+ hours to unlock"
+                  >
+                    <Lock className="w-3 h-3 text-muted-foreground/50" />
+                  </span>
+                )}
 
                 {/* Active glow dot */}
                 {isActive && (
@@ -462,7 +483,7 @@ function AppInner() {
                 "'Bricolage Grotesque', 'Sora', system-ui, sans-serif",
             }}
           >
-            Focus<span className="text-gradient-primary">Flow</span>
+            Focus<span className="text-gradient-primary">Tree</span>
           </span>
           <div className="ml-auto">
             <span className="text-xs text-muted-foreground tracking-wide">
@@ -573,6 +594,18 @@ function AppInner() {
                   <Whiteboard />
                 </motion.div>
               )}
+              {activeTab === "games" && (
+                <motion.div
+                  key="games"
+                  data-ocid="games.section"
+                  initial={pageVariants.initial}
+                  animate={pageVariants.animate}
+                  exit={pageVariants.exit}
+                  transition={pageTransition}
+                >
+                  <GamesSection />
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
 
@@ -598,6 +631,7 @@ function AppInner() {
         <nav className="lg:hidden border-t border-border glass-card flex items-center justify-around px-1 py-2 overflow-x-auto">
           {NAV_ITEMS.map((item) => {
             const isActive = activeTab === item.id;
+            const isGamesLocked = item.id === "games" && gamesLocked;
             return (
               <motion.button
                 type="button"
@@ -610,10 +644,29 @@ function AppInner() {
                 whileTap={{ scale: 0.88 }}
               >
                 <motion.div
+                  className="relative"
                   animate={isActive ? { scale: 1.1 } : { scale: 1 }}
                   transition={{ type: "spring", stiffness: 400, damping: 18 }}
                 >
                   <item.icon className="w-5 h-5" />
+                  {item.id === "games" && (
+                    <span
+                      className="absolute -top-1.5 -right-2 animate-pulse text-[7px] font-bold uppercase rounded-full px-1 py-px leading-tight"
+                      style={{
+                        color: "oklch(0.85 0.20 162)",
+                        background: "oklch(0.22 0.12 162 / 0.80)",
+                        boxShadow: "0 0 6px oklch(0.72 0.17 162 / 0.60)",
+                        border: "1px solid oklch(0.72 0.17 162 / 0.40)",
+                      }}
+                    >
+                      NEW
+                    </span>
+                  )}
+                  {isGamesLocked && (
+                    <span className="absolute -bottom-1 -right-1">
+                      <Lock className="w-2.5 h-2.5 text-muted-foreground/50" />
+                    </span>
+                  )}
                 </motion.div>
                 <span
                   className={`text-[10px] font-medium ${

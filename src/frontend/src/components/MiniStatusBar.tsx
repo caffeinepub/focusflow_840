@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useMusic } from "@/contexts/MusicContext";
 import { useTimer } from "@/contexts/TimerContext";
-import { Pause, Play, SkipForward, Timer, TimerOff } from "lucide-react";
+import { Pause, Play, SkipForward, Timer, Watch } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 interface MiniStatusBarProps {
@@ -17,26 +17,22 @@ export function MiniStatusBar({
     useTimer();
   const { currentTrack, isPlaying, togglePlay, skipNext } = useMusic();
 
-  const showCountdown =
-    mode === "timer" &&
+  const isStopwatchMode = mode === "stopwatch";
+
+  const showTimer =
+    !isStopwatchMode &&
     (running || (remaining > 0 && remaining < totalSeconds));
-  const showStopwatch = mode === "stopwatch" && (swRunning || swElapsed > 0);
-  const showTimer = showCountdown || showStopwatch;
+  const showStopwatch = isStopwatchMode && (swRunning || swElapsed > 0);
   const showMusic = isPlaying;
-  const show = showTimer || showMusic;
+  const show = showTimer || showStopwatch || showMusic;
 
   const cdMinutes = Math.floor(remaining / 60);
   const cdSeconds = remaining % 60;
   const pct =
     totalSeconds > 0 ? ((totalSeconds - remaining) / totalSeconds) * 100 : 0;
 
-  const swHours = Math.floor(swElapsed / 3600);
-  const swMins = Math.floor((swElapsed % 3600) / 60);
-  const swSecs = swElapsed % 60;
-  const swDisplay =
-    swHours > 0
-      ? `${String(swHours).padStart(2, "0")}:${String(swMins).padStart(2, "0")}:${String(swSecs).padStart(2, "0")}`
-      : `${String(swMins).padStart(2, "0")}:${String(swSecs).padStart(2, "0")}`;
+  const swMinutes = Math.floor(swElapsed / 60);
+  const swSeconds = swElapsed % 60;
 
   const isActive = running || swRunning;
 
@@ -92,7 +88,7 @@ export function MiniStatusBar({
             />
 
             {/* Countdown progress bar */}
-            {showCountdown && (
+            {showTimer && (
               <div
                 className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full overflow-hidden pointer-events-none"
                 style={{ opacity: 0.45 }}
@@ -110,6 +106,37 @@ export function MiniStatusBar({
               </div>
             )}
 
+            {/* Stopwatch progress bar — pulsing when running */}
+            {showStopwatch && (
+              <div
+                className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full overflow-hidden pointer-events-none"
+                style={{ opacity: 0.45 }}
+              >
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, oklch(0.62 0.24 145), oklch(0.72 0.18 162))",
+                    boxShadow: "0 0 8px oklch(0.62 0.24 145)",
+                  }}
+                  animate={
+                    swRunning
+                      ? { opacity: [0.6, 1, 0.6], width: "100%" }
+                      : { opacity: 0.5, width: "100%" }
+                  }
+                  transition={
+                    swRunning
+                      ? {
+                          duration: 1.8,
+                          repeat: Number.POSITIVE_INFINITY,
+                          ease: "easeInOut",
+                        }
+                      : {}
+                  }
+                />
+              </div>
+            )}
+
             {/* Timer section */}
             {showTimer && (
               <motion.button
@@ -121,63 +148,101 @@ export function MiniStatusBar({
                 whileTap={{ scale: 0.96 }}
               >
                 <motion.div
-                  animate={isActive ? { opacity: [1, 0.4, 1] } : { opacity: 1 }}
+                  animate={running ? { opacity: [1, 0.4, 1] } : { opacity: 1 }}
                   transition={{
                     duration: 1.6,
-                    repeat: isActive ? Number.POSITIVE_INFINITY : 0,
+                    repeat: running ? Number.POSITIVE_INFINITY : 0,
                     ease: "easeInOut",
                   }}
                 >
-                  {showStopwatch ? (
-                    <TimerOff
-                      className="w-3.5 h-3.5 flex-shrink-0"
-                      style={{ color: "oklch(0.72 0.17 162)" }}
-                    />
-                  ) : (
-                    <Timer
-                      className="w-3.5 h-3.5 flex-shrink-0"
-                      style={{ color: "oklch(0.72 0.17 162)" }}
-                    />
-                  )}
+                  <Timer
+                    className="w-3.5 h-3.5 flex-shrink-0"
+                    style={{ color: "oklch(0.72 0.17 162)" }}
+                  />
                 </motion.div>
                 <span
                   className="font-mono font-bold tabular-nums text-sm tracking-wider"
                   style={{
                     fontFamily: "'JetBrains Mono', 'Geist Mono', monospace",
-                    color: isActive
+                    color: running
                       ? "oklch(0.95 0.008 255)"
                       : "oklch(0.50 0.018 255)",
-                    filter: isActive
+                    filter: running
                       ? "drop-shadow(0 0 7px oklch(0.72 0.17 162 / 0.7))"
                       : "none",
                   }}
                 >
-                  {showStopwatch
-                    ? swDisplay
-                    : `${String(cdMinutes).padStart(2, "0")}:${String(cdSeconds).padStart(2, "0")}`}
+                  {`${String(cdMinutes).padStart(2, "0")}:${String(cdSeconds).padStart(2, "0")}`}
                 </span>
                 <span
                   className="text-[10px] tracking-widest uppercase font-semibold hidden sm:block"
                   style={{
-                    color: isActive
+                    color: running
                       ? "oklch(0.72 0.17 162)"
                       : "oklch(0.38 0.018 255)",
                     letterSpacing: "0.10em",
                   }}
                 >
-                  {showStopwatch
-                    ? swRunning
-                      ? "Study"
-                      : "Paused"
-                    : running
-                      ? "Focus"
-                      : "Paused"}
+                  {running ? "Focus" : "Paused"}
+                </span>
+              </motion.button>
+            )}
+
+            {/* Stopwatch section */}
+            {showStopwatch && (
+              <motion.button
+                type="button"
+                onClick={onGoToTimer}
+                data-ocid="mini_status_bar.stopwatch_button"
+                className="flex items-center gap-2 px-2.5 py-1 rounded-full cursor-pointer transition-all duration-200 hover:bg-white/8"
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <motion.div
+                  animate={
+                    swRunning ? { opacity: [1, 0.4, 1] } : { opacity: 1 }
+                  }
+                  transition={{
+                    duration: 1.6,
+                    repeat: swRunning ? Number.POSITIVE_INFINITY : 0,
+                    ease: "easeInOut",
+                  }}
+                >
+                  <Watch
+                    className="w-3.5 h-3.5 flex-shrink-0"
+                    style={{ color: "oklch(0.68 0.22 145)" }}
+                  />
+                </motion.div>
+                <span
+                  className="font-mono font-bold tabular-nums text-sm tracking-wider"
+                  style={{
+                    fontFamily: "'JetBrains Mono', 'Geist Mono', monospace",
+                    color: swRunning
+                      ? "oklch(0.95 0.008 255)"
+                      : "oklch(0.50 0.018 255)",
+                    filter: swRunning
+                      ? "drop-shadow(0 0 7px oklch(0.68 0.22 145 / 0.7))"
+                      : "none",
+                  }}
+                >
+                  {`${String(swMinutes).padStart(2, "0")}:${String(swSeconds).padStart(2, "0")}`}
+                </span>
+                <span
+                  className="text-[10px] tracking-widest uppercase font-semibold hidden sm:block"
+                  style={{
+                    color: swRunning
+                      ? "oklch(0.68 0.22 145)"
+                      : "oklch(0.38 0.018 255)",
+                    letterSpacing: "0.10em",
+                  }}
+                >
+                  {swRunning ? "Stopwatch" : "Paused"}
                 </span>
               </motion.button>
             )}
 
             {/* Divider */}
-            {showTimer && showMusic && (
+            {(showTimer || showStopwatch) && showMusic && (
               <div
                 className="w-px h-5 flex-shrink-0 mx-1"
                 style={{ background: "oklch(0.72 0.17 162 / 0.20)" }}

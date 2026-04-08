@@ -14,8 +14,6 @@ import { toast } from "sonner";
 
 const WATER_INTERVAL_MS = 30 * 60 * 1000;
 
-export type TimerMode = "timer" | "stopwatch";
-
 function playCompletionSound() {
   try {
     const ctx = new AudioContext();
@@ -44,8 +42,9 @@ function playCompletionSound() {
 }
 
 export interface TimerContextValue {
-  mode: TimerMode;
-  setMode: (m: TimerMode) => void;
+  // --- mode ---
+  mode: "timer" | "stopwatch";
+  setMode: (m: "timer" | "stopwatch") => void;
   // --- countdown timer ---
   totalSeconds: number;
   remaining: number;
@@ -62,22 +61,22 @@ export interface TimerContextValue {
   handleCustomTime: () => void;
   applyPreset: (min: number) => void;
   // --- stopwatch ---
-  swElapsed: number; // seconds elapsed
+  swElapsed: number;
   swRunning: boolean;
-  swHandleStart: () => void;
-  swHandleStop: () => void;
-  swHandleReset: () => void;
+  swStart: () => void;
+  swPauseResume: () => void;
+  swReset: () => void;
+  swStop: () => void;
   // --- shared ---
   sessions: ReturnType<typeof useSessionHistory>["sessions"];
   clearSessions: () => void;
-  // --- half-time signal ---
-  halfTimeFired: boolean;
 }
 
 const TimerContext = createContext<TimerContextValue | null>(null);
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<TimerMode>("timer");
+  // --- Mode ---
+  const [mode, setModeState] = useState<"timer" | "stopwatch">("timer");
 
   // --- Countdown timer state ---
   const [totalSeconds, setTotalSeconds] = useState(25 * 60);
@@ -87,14 +86,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [customHours, setCustomHours] = useState("0");
   const [customMinutes, setCustomMinutes] = useState("25");
   const [customSeconds, setCustomSeconds] = useState("0");
-  const [halfTimeFired, setHalfTimeFired] = useState(false);
 
   // --- Stopwatch state ---
   const [swElapsed, setSwElapsed] = useState(0);
   const [swRunning, setSwRunning] = useState(false);
-  const swIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const swStartTimeRef = useRef<number | null>(null);
-  const swBaseElapsedRef = useRef(0); // accumulated seconds before last resume
+  const swBaseElapsedRef = useRef<number>(0);
+  const swIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const swWaterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { sessions, addSession, clearSessions } = useSessionHistory();
   const { mutate: completeSession } = useCompleteStudySession();
@@ -108,10 +107,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const waterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const startRemainingRef = useRef<number>(remaining);
-  const halfTimeFiredRef = useRef(false);
-  const halfTimeFiredStateTimeoutRef = useRef<ReturnType<
-    typeof setTimeout
-  > | null>(null);
 
   const clearTimers = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -120,13 +115,19 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     waterTimerRef.current = null;
   }, []);
 
+  const clearSwTimers = useCallback(() => {
+    if (swIntervalRef.current) clearInterval(swIntervalRef.current);
+    if (swWaterTimerRef.current) clearInterval(swWaterTimerRef.current);
+    swIntervalRef.current = null;
+    swWaterTimerRef.current = null;
+  }, []);
+
   const handleComplete = useCallback(() => {
     playCompletionSound();
     clearTimers();
     setRunning(false);
     setRemaining(0);
     startTimeRef.current = null;
-    halfTimeFiredRef.current = false;
     const duration = Math.round(totalSecondsRef.current / 60);
     completeSession(BigInt(duration));
     addSession(duration);
@@ -148,26 +149,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       handleComplete();
     } else {
       setRemaining(newRemaining);
-      const halfPoint = Math.floor(totalSecondsRef.current / 2);
-      if (
-        newRemaining <= halfPoint &&
-        newRemaining > 0 &&
-        !halfTimeFiredRef.current
-      ) {
-        halfTimeFiredRef.current = true;
-        setHalfTimeFired(true);
-        if (halfTimeFiredStateTimeoutRef.current)
-          clearTimeout(halfTimeFiredStateTimeoutRef.current);
-        halfTimeFiredStateTimeoutRef.current = setTimeout(
-          () => setHalfTimeFired(false),
-          9000,
-        );
-        toast("⚡ Halfway there!", {
-          description:
-            "You're doing amazing — push through the second half and finish strong! You've got this! 💪",
-          duration: 6000,
-        });
-      }
     }
   }, [handleComplete]);
 
@@ -196,19 +177,12 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [running, swRunning, syncFromWallClock]);
+  }, [running, syncFromWallClock, swRunning]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Stopwatch sync ---
-  function syncStopwatch() {
-    if (swStartTimeRef.current === null) return;
-    const elapsed =
-      swBaseElapsedRef.current +
-      Math.floor((Date.now() - swStartTimeRef.current) / 1000);
-    setSwElapsed(elapsed);
-  }
-
-  function startWaterReminder() {
-    waterTimerRef.current = setInterval(() => {
+  function startWaterReminder(
+    ref: React.MutableRefObject<ReturnType<typeof setInterval> | null>,
+  ) {
+    ref.current = setInterval(() => {
       toast("💧 Hydration Reminder!", {
         description:
           "You've been studying for 30 minutes. Time to drink some water!",
@@ -225,8 +199,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setRemaining(totalSeconds);
         remainingRef.current = totalSeconds;
       }
-      halfTimeFiredRef.current = false;
-      startWaterReminder();
+      startWaterReminder(waterTimerRef);
     } else {
       if (waterTimerRef.current) clearInterval(waterTimerRef.current);
     }
@@ -240,7 +213,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     remainingRef.current = totalSeconds;
     startRemainingRef.current = totalSeconds;
     startTimeRef.current = null;
-    halfTimeFiredRef.current = false;
   }
 
   function handleCustomTime() {
@@ -256,7 +228,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     startTimeRef.current = null;
     setRunning(false);
     clearTimers();
-    halfTimeFiredRef.current = false;
   }
 
   function applyPreset(min: number) {
@@ -271,54 +242,90 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     startTimeRef.current = null;
     setRunning(false);
     clearTimers();
-    halfTimeFiredRef.current = false;
   }
 
-  // --- Stopwatch handlers ---
-  function swHandleStart() {
-    if (swRunning) return;
+  // --- Stopwatch sync ---
+  function syncStopwatch() {
+    if (swStartTimeRef.current === null) return;
+    const elapsed =
+      swBaseElapsedRef.current +
+      Math.floor((Date.now() - swStartTimeRef.current) / 1000);
+    setSwElapsed(elapsed);
+  }
+
+  function swStart() {
     swStartTimeRef.current = Date.now();
+    swBaseElapsedRef.current = 0;
+    setSwElapsed(0);
     setSwRunning(true);
-    startWaterReminder();
     swIntervalRef.current = setInterval(syncStopwatch, 500);
+    startWaterReminder(swWaterTimerRef);
   }
 
-  function swHandleStop() {
-    if (!swRunning) return;
-    // Accumulate elapsed before stopping
+  function swPauseResume() {
+    if (swRunning) {
+      // pause
+      clearSwTimers();
+      if (swStartTimeRef.current !== null) {
+        swBaseElapsedRef.current += Math.floor(
+          (Date.now() - swStartTimeRef.current) / 1000,
+        );
+      }
+      swStartTimeRef.current = null;
+      setSwRunning(false);
+    } else {
+      // resume
+      swStartTimeRef.current = Date.now();
+      setSwRunning(true);
+      swIntervalRef.current = setInterval(syncStopwatch, 500);
+      startWaterReminder(swWaterTimerRef);
+    }
+  }
+
+  function swReset() {
+    clearSwTimers();
+    setSwRunning(false);
+    setSwElapsed(0);
+    swStartTimeRef.current = null;
+    swBaseElapsedRef.current = 0;
+  }
+
+  function swStop() {
+    clearSwTimers();
+    // compute final elapsed
+    let finalElapsed = swBaseElapsedRef.current;
     if (swStartTimeRef.current !== null) {
-      swBaseElapsedRef.current += Math.floor(
-        (Date.now() - swStartTimeRef.current) / 1000,
-      );
+      finalElapsed += Math.floor((Date.now() - swStartTimeRef.current) / 1000);
     }
-    swStartTimeRef.current = null;
     setSwRunning(false);
-    if (swIntervalRef.current) clearInterval(swIntervalRef.current);
-    if (waterTimerRef.current) clearInterval(waterTimerRef.current);
-
-    const totalElapsed = swBaseElapsedRef.current;
-    const durationMinutes = Math.round(totalElapsed / 60);
-    if (durationMinutes >= 1) {
-      playCompletionSound();
-      completeSession(BigInt(durationMinutes));
-      addSession(durationMinutes);
-      toast.success("Stopwatch Stopped! 🎉", {
-        description: `You studied for ${durationMinutes} minute${durationMinutes !== 1 ? "s" : ""}. Keep it up!`,
-        duration: 5000,
-      });
-    }
-    // Reset after saving
+    swStartTimeRef.current = null;
     swBaseElapsedRef.current = 0;
+    const durationMinutes = Math.max(1, Math.round(finalElapsed / 60));
+    completeSession(BigInt(durationMinutes));
+    addSession(durationMinutes);
     setSwElapsed(0);
+    playCompletionSound();
+    toast.success("Stopwatch Session Saved! ⏱️", {
+      description: `You studied for ${durationMinutes} minute${durationMinutes !== 1 ? "s" : ""}. Keep it up!`,
+      duration: 5000,
+    });
   }
 
-  function swHandleReset() {
-    if (swIntervalRef.current) clearInterval(swIntervalRef.current);
-    if (waterTimerRef.current) clearInterval(waterTimerRef.current);
+  // --- Mode switch ---
+  function setMode(m: "timer" | "stopwatch") {
+    // Stop everything when switching
+    clearTimers();
+    clearSwTimers();
+    setRunning(false);
+    setRemaining(totalSeconds);
+    remainingRef.current = totalSeconds;
+    startRemainingRef.current = totalSeconds;
+    startTimeRef.current = null;
+    setSwRunning(false);
+    setSwElapsed(0);
     swStartTimeRef.current = null;
     swBaseElapsedRef.current = 0;
-    setSwElapsed(0);
-    setSwRunning(false);
+    setModeState(m);
   }
 
   return (
@@ -342,12 +349,12 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         applyPreset,
         swElapsed,
         swRunning,
-        swHandleStart,
-        swHandleStop,
-        swHandleReset,
+        swStart,
+        swPauseResume,
+        swReset,
+        swStop,
         sessions,
         clearSessions,
-        halfTimeFired,
       }}
     >
       {children}

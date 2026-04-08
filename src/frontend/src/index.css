@@ -589,3 +589,13 @@ body::after {
     opacity: 0;
   }
 }
+
+/* Stopwatch ring spin */
+@keyframes sw-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
