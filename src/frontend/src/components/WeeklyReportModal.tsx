@@ -33,7 +33,7 @@ function getAppreciationMessage(totalMinutes: number): string {
     return "Great effort this week! You're building real momentum! 💪";
   if (totalMinutes >= 30)
     return "Nice start! Every minute of focus counts! Keep going! ✨";
-  return "You opened FocusTree — that's the first step! Let's make next week count! 🚀";
+  return "You opened Stoa — that's the first step! Let's make next week count! 🚀";
 }
 
 function getMotivationalPush(totalMinutes: number): string {

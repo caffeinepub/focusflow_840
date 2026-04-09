@@ -16,6 +16,8 @@ import {
   Watch,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { useCallback, useState } from "react";
+import { HardcoreMode, type HardcoreStatus } from "./HardcoreMode";
 
 // Animated digit — flips up/down when value changes
 function AnimatedDigit({
@@ -134,7 +136,14 @@ export function StudyTimer() {
     swStop,
     sessions,
     clearSessions,
+    forcePause,
   } = useTimer();
+
+  const [hardcoreStatus, setHardcoreStatus] = useState<HardcoreStatus>("off");
+
+  const handleHardcoreStatusChange = useCallback((s: HardcoreStatus) => {
+    setHardcoreStatus(s);
+  }, []);
 
   const completed = sessions.length;
 
@@ -257,6 +266,21 @@ export function StudyTimer() {
           duration: 0.55,
           ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
         }}
+        style={
+          hardcoreStatus === "active"
+            ? {
+                border: "1.5px solid oklch(0.55 0.22 25 / 0.55)",
+                boxShadow:
+                  "0 0 32px oklch(0.55 0.22 25 / 0.20), 0 0 60px oklch(0.50 0.18 25 / 0.08)",
+              }
+            : hardcoreStatus === "warning"
+              ? {
+                  border: "1.5px solid oklch(0.55 0.22 25 / 0.80)",
+                  boxShadow:
+                    "0 0 48px oklch(0.55 0.22 25 / 0.35), 0 0 90px oklch(0.50 0.18 25 / 0.15)",
+                }
+              : {}
+        }
       >
         <div
           className={`relative ${isActive ? "animate-timer-pulse" : ""}`}
@@ -718,6 +742,15 @@ export function StudyTimer() {
             </span>
           </motion.div>
         )}
+
+        {/* Hardcore Mode — badge / activate button */}
+        <div className="mt-5 flex items-center justify-center">
+          <HardcoreMode
+            isRunning={isActive}
+            onPauseTimer={forcePause}
+            onStatusChange={handleHardcoreStatusChange}
+          />
+        </div>
       </motion.div>
 
       {/* Custom duration — timer mode only */}

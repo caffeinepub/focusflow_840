@@ -310,7 +310,7 @@ function AppInner() {
                   "'Bricolage Grotesque', 'Sora', system-ui, sans-serif",
               }}
             >
-              Focus<span className="text-gradient-primary">Tree</span>
+              Focus<span className="text-gradient-primary">Stoa</span>
             </span>
             <div className="text-[9px] text-muted-foreground/45 tracking-widest uppercase mt-0.5">
               Study Companion
@@ -483,7 +483,7 @@ function AppInner() {
                 "'Bricolage Grotesque', 'Sora', system-ui, sans-serif",
             }}
           >
-            Focus<span className="text-gradient-primary">Tree</span>
+            Focus<span className="text-gradient-primary">Stoa</span>
           </span>
           <div className="ml-auto">
             <span className="text-xs text-muted-foreground tracking-wide">

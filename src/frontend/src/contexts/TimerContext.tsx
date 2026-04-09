@@ -70,6 +70,8 @@ export interface TimerContextValue {
   // --- shared ---
   sessions: ReturnType<typeof useSessionHistory>["sessions"];
   clearSessions: () => void;
+  /** Force-pauses whichever mode is currently running (used by hardcore mode) */
+  forcePause: () => void;
 }
 
 const TimerContext = createContext<TimerContextValue | null>(null);
@@ -328,6 +330,24 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     setModeState(m);
   }
 
+  /** Force-pause whichever mode is active — used by hardcore mode */
+  function forcePause() {
+    if (mode === "timer" && running) {
+      if (waterTimerRef.current) clearInterval(waterTimerRef.current);
+      setRunning(false);
+    }
+    if (mode === "stopwatch" && swRunning) {
+      clearSwTimers();
+      if (swStartTimeRef.current !== null) {
+        swBaseElapsedRef.current += Math.floor(
+          (Date.now() - swStartTimeRef.current) / 1000,
+        );
+      }
+      swStartTimeRef.current = null;
+      setSwRunning(false);
+    }
+  }
+
   return (
     <TimerContext.Provider
       value={{
@@ -355,6 +375,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         swStop,
         sessions,
         clearSessions,
+        forcePause,
       }}
     >
       {children}

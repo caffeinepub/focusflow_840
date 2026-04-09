@@ -2,14 +2,18 @@ import { Slider } from "@/components/ui/slider";
 import {
   Download,
   Eraser,
+  FileText,
   Palette,
   Pen,
+  Plus,
   Trash2,
   Undo2,
+  X,
   Zap,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 type Tool = "pen" | "eraser" | "laser";
 
@@ -31,7 +35,147 @@ const COLORS = [
 ];
 
 const LASER_FADE_MS = 5000;
+const CANVAS_BG = "#0a0a10";
 
+interface Slide {
+  id: string;
+  dataURL: string;
+}
+
+let _slideId = 0;
+function mkSlideId() {
+  return `s${++_slideId}`;
+}
+
+function blankDataURL(w: number, h: number): string {
+  const c = document.createElement("canvas");
+  c.width = w || 800;
+  c.height = h || 500;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = CANVAS_BG;
+  ctx.fillRect(0, 0, c.width, c.height);
+  return c.toDataURL();
+}
+
+function exportAllAsPdf(
+  slides: Slide[],
+  currentIdx: number,
+  currentCanvas: HTMLCanvasElement | null,
+) {
+  const allSlides = slides.map((s, i) => {
+    if (i === currentIdx && currentCanvas) return currentCanvas.toDataURL();
+    return s.dataURL;
+  });
+
+  const rows = allSlides
+    .map(
+      (src, i) =>
+        `<div class="page"><img src="${src}"/><div class="lbl">Slide ${i + 1} / ${allSlides.length}</div></div>`,
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>Stoa Whiteboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000}
+.page{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a10;page-break-after:always;position:relative}
+.page:last-child{page-break-after:avoid}
+img{max-width:100%;max-height:100%;display:block}
+.lbl{position:absolute;bottom:10px;right:14px;font-family:sans-serif;font-size:11px;color:rgba(255,255,255,.3)}
+@media print{.page{page-break-after:always}.page:last-child{page-break-after:avoid}}
+</style></head><body>
+${rows}
+<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) {
+    toast.error("Popup blocked", {
+      description: "Allow popups for this site to export as PDF.",
+      duration: 5000,
+    });
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+/* ── Slide thumbnail ── */
+function SlideThumbnail({
+  dataURL,
+  index,
+  active,
+  onClick,
+  onDelete,
+  canDelete,
+}: {
+  dataURL: string;
+  index: number;
+  active: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+  canDelete: boolean;
+}) {
+  return (
+    <motion.div
+      className="relative flex-shrink-0 cursor-pointer group"
+      style={{ width: 96, height: 62 }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.96 }}
+      onClick={onClick}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -8, scale: 0.8 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
+    >
+      <img
+        src={dataURL}
+        alt={`Slide ${index + 1}`}
+        className="w-full h-full rounded-xl object-cover"
+        style={{
+          border: active
+            ? "2px solid oklch(0.55 0.18 270 / 0.9)"
+            : "1.5px solid oklch(0.28 0.04 270 / 0.5)",
+          boxShadow: active
+            ? "0 0 14px oklch(0.55 0.18 270 / 0.45)"
+            : "0 2px 8px oklch(0 0 0 / 0.5)",
+          transition: "border 0.2s, box-shadow 0.2s",
+        }}
+      />
+      <div
+        className="absolute bottom-1 left-1.5 text-[9px] font-bold rounded px-1"
+        style={{
+          background: "oklch(0.08 0.02 270 / 0.8)",
+          color: active ? "oklch(0.78 0.14 270)" : "oklch(0.50 0.04 270)",
+        }}
+      >
+        {index + 1}
+      </div>
+      {canDelete && (
+        <motion.button
+          type="button"
+          aria-label="Delete slide"
+          className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{
+            background: "oklch(0.22 0.08 25 / 0.95)",
+            border: "1px solid oklch(0.50 0.18 25 / 0.6)",
+          }}
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.85 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <X className="w-2 h-2" style={{ color: "oklch(0.72 0.14 25)" }} />
+        </motion.button>
+      )}
+    </motion.div>
+  );
+}
+
+/* ── Whiteboard ── */
 export function Whiteboard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const laserCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,13 +189,16 @@ export function Whiteboard() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
 
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const slidesInitialized = useRef(false);
+
   const historyRef = useRef<ImageData[]>([]);
   const laserPoints = useRef<Point[]>([]);
   const laserAnimRef = useRef<number | null>(null);
   const laserStopTimeRef = useRef<number | null>(null);
   const lastPos = useRef<Point | null>(null);
-
-  const getCanvasBg = () => "#0a0a10";
+  const switchingSlide = useRef(false);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -64,14 +211,16 @@ export function Whiteboard() {
     if (ctx && canvas.width > 0 && canvas.height > 0) {
       try {
         saved = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
     canvas.width = width;
     canvas.height = height;
     laser.width = width;
     laser.height = height;
     if (ctx) {
-      ctx.fillStyle = getCanvasBg();
+      ctx.fillStyle = CANVAS_BG;
       ctx.fillRect(0, 0, width, height);
       if (saved) ctx.putImageData(saved, 0, 0);
     }
@@ -84,12 +233,102 @@ export function Whiteboard() {
     return () => ro.disconnect();
   }, [resizeCanvas]);
 
+  // Init first slide once canvas is ready
+  useEffect(() => {
+    if (slidesInitialized.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas || canvas.width === 0) return;
+    slidesInitialized.current = true;
+    setSlides([{ id: mkSlideId(), dataURL: canvas.toDataURL() }]);
+  });
+
   useEffect(
     () => () => {
       if (laserAnimRef.current) cancelAnimationFrame(laserAnimRef.current);
     },
     [],
   );
+
+  function saveCurrentSlideState(): string {
+    return canvasRef.current?.toDataURL() ?? "";
+  }
+
+  function loadSlideIntoCanvas(dataURL: string) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = CANVAS_BG;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!dataURL) return;
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = dataURL;
+  }
+
+  function switchToSlide(index: number) {
+    if (index === currentSlide || switchingSlide.current) return;
+    switchingSlide.current = true;
+    const saved = saveCurrentSlideState();
+    setSlides((prev) => {
+      const next = [...prev];
+      next[currentSlide] = { ...next[currentSlide], dataURL: saved };
+      return next;
+    });
+    setCurrentSlide(index);
+    historyRef.current = [];
+    setCanUndo(false);
+    setTimeout(() => {
+      loadSlideIntoCanvas(slides[index]?.dataURL ?? "");
+      switchingSlide.current = false;
+    }, 0);
+  }
+
+  function addSlide() {
+    const saved = saveCurrentSlideState();
+    const newURL = blankDataURL(
+      canvasRef.current?.width ?? 800,
+      canvasRef.current?.height ?? 500,
+    );
+    const newIndex = slides.length;
+    setSlides((prev) => {
+      const next = [...prev];
+      next[currentSlide] = { ...next[currentSlide], dataURL: saved };
+      return [...next, { id: mkSlideId(), dataURL: newURL }];
+    });
+    setCurrentSlide(newIndex);
+    historyRef.current = [];
+    setCanUndo(false);
+    setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = CANVAS_BG;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }, 0);
+  }
+
+  function deleteSlide(index: number) {
+    if (slides.length <= 1) return;
+    const savedCurrent = saveCurrentSlideState();
+    const newSlides = slides.map((s, i) =>
+      i === currentSlide ? { ...s, dataURL: savedCurrent } : s,
+    );
+    newSlides.splice(index, 1);
+    const newIndex = Math.min(index, newSlides.length - 1);
+    setSlides(newSlides);
+    setCurrentSlide(newIndex);
+    historyRef.current = [];
+    setCanUndo(false);
+    setTimeout(() => {
+      loadSlideIntoCanvas(newSlides[newIndex]?.dataURL ?? "");
+    }, 0);
+  }
 
   const getPos = (e: React.PointerEvent): Point => {
     const canvas = canvasRef.current!;
@@ -116,7 +355,7 @@ export function Whiteboard() {
     if (historyRef.current.length > 0) {
       ctx.putImageData(historyRef.current[historyRef.current.length - 1], 0, 0);
     } else {
-      ctx.fillStyle = getCanvasBg();
+      ctx.fillStyle = CANVAS_BG;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     setCanUndo(historyRef.current.length > 0);
@@ -128,7 +367,7 @@ export function Whiteboard() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     saveHistory();
-    ctx.fillStyle = getCanvasBg();
+    ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
 
@@ -136,7 +375,7 @@ export function Whiteboard() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = "focusflow-whiteboard.png";
+    link.download = "stoa-whiteboard.png";
     link.href = canvas.toDataURL();
     link.click();
   };
@@ -154,11 +393,9 @@ export function Whiteboard() {
     for (let i = 1; i < total; i++) {
       const trailFrac = i / total;
       const segAlpha = globalAlpha * (trailFrac * 0.85 + 0.15);
-
       const p0 = pts[i - 1];
       const p1 = pts[i];
 
-      // Outer soft halo
       ctx.beginPath();
       ctx.strokeStyle = `rgba(255, 30, 80, ${segAlpha * 0.18})`;
       ctx.lineWidth = 40 * trailFrac + 10;
@@ -169,7 +406,6 @@ export function Whiteboard() {
       ctx.lineTo(p1.x, p1.y);
       ctx.stroke();
 
-      // Mid glow
       ctx.beginPath();
       ctx.strokeStyle = `rgba(255, 80, 100, ${segAlpha * 0.55})`;
       ctx.lineWidth = 18 * trailFrac + 5;
@@ -180,7 +416,6 @@ export function Whiteboard() {
       ctx.lineTo(p1.x, p1.y);
       ctx.stroke();
 
-      // Inner bright core
       ctx.beginPath();
       ctx.strokeStyle = `rgba(255, 180, 180, ${segAlpha})`;
       ctx.lineWidth = 6 * trailFrac + 2;
@@ -191,7 +426,6 @@ export function Whiteboard() {
       ctx.lineTo(p1.x, p1.y);
       ctx.stroke();
 
-      // Bright white center line
       ctx.beginPath();
       ctx.strokeStyle = `rgba(255, 255, 255, ${segAlpha * 0.9})`;
       ctx.lineWidth = 2 * trailFrac + 1;
@@ -202,7 +436,6 @@ export function Whiteboard() {
       ctx.stroke();
     }
 
-    // Tip glow dot
     const tip = pts[total - 1];
     const bloomGrad = ctx.createRadialGradient(
       tip.x,
@@ -331,7 +564,6 @@ export function Whiteboard() {
         laserStopTimeRef.current = null;
         return;
       }
-      // Smooth sinusoidal ease-in-out fade
       const t = elapsed / LASER_FADE_MS;
       const alpha = 1 - (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
       renderLaserTrail(Math.max(0, alpha));
@@ -363,7 +595,8 @@ export function Whiteboard() {
             White<span className="text-gradient-primary">board</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Draw, sketch, and annotate freely
+            Draw, sketch, and annotate freely — {slides.length} slide
+            {slides.length !== 1 ? "s" : ""}
           </p>
         </motion.div>
       </div>
@@ -433,7 +666,6 @@ export function Whiteboard() {
                   whileTap={{ scale: 0.85 }}
                 />
               ))}
-              {/* Custom color picker */}
               <div className="relative">
                 <motion.button
                   type="button"
@@ -501,9 +733,28 @@ export function Whiteboard() {
               onClick={downloadCanvas}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white/8 transition-all"
               whileTap={{ scale: 0.9 }}
+              title="Save current slide as PNG"
             >
               <Download className="w-3.5 h-3.5" />
-              Save PNG
+              PNG
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() =>
+                exportAllAsPdf(slides, currentSlide, canvasRef.current)
+              }
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+              style={{
+                color: "oklch(0.72 0.14 270)",
+                background: "oklch(0.16 0.06 270 / 0.4)",
+                border: "1px solid oklch(0.35 0.10 270 / 0.35)",
+              }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.9 }}
+              title="Export all slides as PDF"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Save PDF
             </motion.button>
             <motion.button
               type="button"
@@ -518,14 +769,70 @@ export function Whiteboard() {
         </motion.div>
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 px-6 pb-6">
+      {/* Main: slides panel + canvas */}
+      <div className="flex flex-1 gap-3 px-6 pb-6 min-h-0">
+        {/* Slides panel */}
+        <motion.div
+          className="flex flex-col gap-2 flex-shrink-0"
+          style={{ width: 112 }}
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.15, duration: 0.35 }}
+        >
+          <div
+            className="flex-1 rounded-2xl p-2 flex flex-col gap-2 overflow-y-auto"
+            style={{
+              background: "oklch(0.09 0.02 270 / 0.7)",
+              border: "1px solid oklch(0.22 0.04 270 / 0.5)",
+              boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.04)",
+              scrollbarWidth: "thin",
+              scrollbarColor: "oklch(0.28 0.06 270 / 0.5) transparent",
+            }}
+          >
+            <AnimatePresence>
+              {slides.map((slide, i) => (
+                <SlideThumbnail
+                  key={slide.id}
+                  dataURL={slide.dataURL}
+                  index={i}
+                  active={i === currentSlide}
+                  canDelete={slides.length > 1}
+                  onClick={() => switchToSlide(i)}
+                  onDelete={() => deleteSlide(i)}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+
+          {/* Add slide */}
+          <motion.button
+            type="button"
+            data-ocid="whiteboard.add_slide"
+            onClick={addSlide}
+            className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold w-full"
+            style={{
+              background: "oklch(0.14 0.06 270 / 0.7)",
+              border: "1.5px solid oklch(0.42 0.12 270 / 0.45)",
+              color: "oklch(0.68 0.12 270)",
+            }}
+            whileHover={{
+              scale: 1.03,
+              boxShadow: "0 0 14px oklch(0.50 0.15 270 / 0.35)",
+            }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Slide
+          </motion.button>
+        </motion.div>
+
+        {/* Canvas */}
         <motion.div
           ref={containerRef}
-          className="relative w-full h-full rounded-2xl overflow-hidden"
+          className="relative flex-1 rounded-2xl overflow-hidden"
           style={{
             minHeight: 400,
-            background: "#0a0a10",
+            background: CANVAS_BG,
             cursor: toolCursor,
             backgroundImage:
               "radial-gradient(circle, oklch(0.45 0.02 250 / 0.25) 1.5px, transparent 1.5px)",
@@ -537,7 +844,6 @@ export function Whiteboard() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.15, duration: 0.4 }}
         >
-          {/* Ambient top glow */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -559,6 +865,21 @@ export function Whiteboard() {
             ref={laserCanvasRef}
             className="absolute inset-0 pointer-events-none touch-none"
           />
+
+          {/* Slide indicator */}
+          <div className="absolute top-3 left-3 pointer-events-none">
+            <div
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+              style={{
+                background: "oklch(0.10 0.03 270 / 0.85)",
+                border: "1px solid oklch(0.30 0.06 270 / 0.5)",
+                color: "oklch(0.60 0.10 270)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              {currentSlide + 1} / {slides.length}
+            </div>
+          </div>
 
           {/* Laser active label */}
           {tool === "laser" && (

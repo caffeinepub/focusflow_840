@@ -78,7 +78,7 @@ export function LoginPage() {
             <BookOpen className="w-10 h-10 text-primary" />
           </motion.div>
           <h1 className="font-display font-bold text-5xl tracking-tight mb-2">
-            Focus<span className="text-gradient-primary">Flow</span>
+            S<span className="text-gradient-primary">toa</span>
           </h1>
           <p className="text-muted-foreground text-base">
             Your intelligent study companion
