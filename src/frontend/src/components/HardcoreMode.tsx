@@ -25,9 +25,16 @@ interface Props {
    Constants
 ───────────────────────────────────────────── */
 const SOUND_DB_THRESHOLD = 75;
-const CAMERA_CHECK_INTERVAL_MS = 500;
-const NO_PRESENCE_SECONDS = 5;
-const PRESENCE_VARIANCE_THRESHOLD = 12;
+// How many dB above the ambient noise floor triggers a pause
+const SOUND_ABOVE_FLOOR_DB = 25;
+const MIC_POLL_MS = 200;
+const CAM_CHECK_MS = 300;
+// MAD > 8 = motion detected (person present)
+const MOTION_MAD_THRESHOLD = 8;
+// Average brightness < 10 = camera likely covered (treat as present)
+const DARK_FRAME_THRESHOLD = 10;
+// 5 consecutive no-motion checks (~1.5s) → person absent
+const NO_PRESENCE_CHECKS = 5;
 
 /* ─────────────────────────────────────────────
    Module-level refs for stream handoff
@@ -716,6 +723,8 @@ export function HardcoreMode({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Dynamic noise floor — starts at -60 dB and drifts toward ambient
+  const noiseFloorRef = useRef<number>(-60);
 
   // Camera refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -726,6 +735,8 @@ export function HardcoreMode({
   const camCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
+  // Previous frame brightness values for motion detection
+  const prevBrightnessRef = useRef<Float32Array | null>(null);
 
   const statusRef = useRef(status);
   statusRef.current = status;
@@ -758,22 +769,59 @@ export function HardcoreMode({
 
   function startMicMonitoring() {
     if (micIntervalRef.current) return;
-    if (!analyserRef.current) return;
+    if (!analyserRef.current || !audioCtxRef.current) return;
+
     const analyser = analyserRef.current;
+    const audioCtx = audioCtxRef.current;
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.3;
     const bufferLength = analyser.fftSize;
-    const dataArray = new Float32Array(bufferLength);
+    const dataArray = new Uint8Array(bufferLength);
+
+    // Resume AudioContext if it was suspended by browser autoplay policy
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+
     micIntervalRef.current = setInterval(() => {
       if (!isRunningRef.current || statusRef.current !== "active") return;
-      analyser.getFloatTimeDomainData(dataArray);
+      if (!analyserRef.current) return;
+
+      analyserRef.current.getByteTimeDomainData(dataArray);
+
+      // RMS: values are 0-255 with 128 = silence
       let sumSquares = 0;
-      for (const v of dataArray) sumSquares += v * v;
+      for (let i = 0; i < bufferLength; i++) {
+        const normalized = (dataArray[i] - 128) / 128;
+        sumSquares += normalized * normalized;
+      }
       const rms = Math.sqrt(sumSquares / bufferLength);
-      const db = rms > 0 ? 20 * Math.log10(rms) : Number.NEGATIVE_INFINITY;
-      if (db > SOUND_DB_THRESHOLD) {
+
+      // Convert to dB — add tiny epsilon to avoid log(0)
+      const db = 20 * Math.log10(rms + 1e-10);
+
+      // Slowly drift the noise floor toward ambient (if below threshold)
+      if (db < SOUND_DB_THRESHOLD) {
+        // Drift: 10% toward current reading each tick
+        noiseFloorRef.current = noiseFloorRef.current * 0.9 + db * 0.1;
+        // Clamp floor — never let it drift above the trigger zone
+        if (
+          noiseFloorRef.current >
+          SOUND_DB_THRESHOLD - SOUND_ABOVE_FLOOR_DB - 5
+        ) {
+          noiseFloorRef.current = SOUND_DB_THRESHOLD - SOUND_ABOVE_FLOOR_DB - 5;
+        }
+      }
+
+      const isLoud =
+        db > SOUND_DB_THRESHOLD ||
+        db > noiseFloorRef.current + SOUND_ABOVE_FLOOR_DB;
+
+      if (isLoud) {
         setLastDb(db);
         triggerWarning("sound");
       }
-    }, 500);
+    }, MIC_POLL_MS);
   }
 
   function stopMicMonitoring() {
@@ -790,47 +838,76 @@ export function HardcoreMode({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
     noPresenceCountRef.current = 0;
+    prevBrightnessRef.current = null; // reset previous frame on start
+
     camCheckIntervalRef.current = setInterval(() => {
       if (!isRunningRef.current || statusRef.current !== "active") return;
       if (video.readyState < 2) return;
+
       const w = video.videoWidth || 320;
       const h = video.videoHeight || 240;
       canvas.width = w;
       canvas.height = h;
       ctx.drawImage(video, 0, 0, w, h);
-      const cx = Math.floor(w * 0.3);
-      const cy = Math.floor(h * 0.3);
-      const cw = Math.floor(w * 0.4);
-      const ch = Math.floor(h * 0.4);
-      const imageData = ctx.getImageData(cx, cy, cw, ch);
+
+      const imageData = ctx.getImageData(0, 0, w, h);
       const pixels = imageData.data;
-      let sum = 0;
-      const totalPx = cw * ch;
-      for (let i = 0; i < pixels.length; i += 4) {
-        sum +=
-          0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+      const totalPx = w * h;
+
+      // Build current brightness array
+      const currentBrightness = new Float32Array(totalPx);
+      let avgBrightness = 0;
+      for (let i = 0; i < totalPx; i++) {
+        const r = pixels[i * 4];
+        const g = pixels[i * 4 + 1];
+        const b = pixels[i * 4 + 2];
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        currentBrightness[i] = luma;
+        avgBrightness += luma;
       }
-      const mean = sum / totalPx;
-      let varianceSum = 0;
-      for (let i = 0; i < pixels.length; i += 4) {
-        const luma =
-          0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
-        varianceSum += (luma - mean) ** 2;
+      avgBrightness /= totalPx;
+
+      // If frame is very dark (camera covered / pitch-black room),
+      // treat as person present to avoid false positives
+      if (avgBrightness < DARK_FRAME_THRESHOLD) {
+        noPresenceCountRef.current = 0;
+        prevBrightnessRef.current = currentBrightness;
+        return;
       }
-      const variance = varianceSum / totalPx;
-      if (variance < PRESENCE_VARIANCE_THRESHOLD) {
+
+      // First frame — nothing to compare against yet; store and skip
+      if (
+        !prevBrightnessRef.current ||
+        prevBrightnessRef.current.length !== totalPx
+      ) {
+        prevBrightnessRef.current = currentBrightness;
+        return;
+      }
+
+      // Mean absolute difference (MAD) between current and previous frame
+      let madSum = 0;
+      const prev = prevBrightnessRef.current;
+      for (let i = 0; i < totalPx; i++) {
+        madSum += Math.abs(currentBrightness[i] - prev[i]);
+      }
+      const mad = madSum / totalPx;
+
+      // Store current frame for next comparison
+      prevBrightnessRef.current = currentBrightness;
+
+      if (mad > MOTION_MAD_THRESHOLD) {
+        // Motion detected — person is present
+        noPresenceCountRef.current = 0;
+      } else {
         noPresenceCountRef.current += 1;
-        const secondsAbsent =
-          (noPresenceCountRef.current * CAMERA_CHECK_INTERVAL_MS) / 1000;
-        if (secondsAbsent >= NO_PRESENCE_SECONDS) {
+        if (noPresenceCountRef.current >= NO_PRESENCE_CHECKS) {
           noPresenceCountRef.current = 0;
           triggerWarning("camera");
         }
-      } else {
-        noPresenceCountRef.current = 0;
       }
-    }, CAMERA_CHECK_INTERVAL_MS);
+    }, CAM_CHECK_MS);
   }
 
   function stopCameraMonitoring() {
@@ -872,6 +949,10 @@ export function HardcoreMode({
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    // Reset detection state
+    noiseFloorRef.current = -60;
+    prevBrightnessRef.current = null;
+    noPresenceCountRef.current = 0;
   }
 
   /**
@@ -896,8 +977,10 @@ export function HardcoreMode({
         const source = audioCtx.createMediaStreamSource(micStream);
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.3;
         source.connect(analyser);
         analyserRef.current = analyser;
+        noiseFloorRef.current = -60; // reset baseline for new session
         micReady = true;
       } catch {
         toast.error("🎤 Audio context failed", { duration: 4000 });
