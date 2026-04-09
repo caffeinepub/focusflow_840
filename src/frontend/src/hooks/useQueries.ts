@@ -1,30 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Session, Task } from "../backend.d";
-import { useActor } from "./useActor";
-
-export function useGetAllTasks() {
-  const { actor, isFetching } = useActor();
-  return useQuery<Task[]>({
-    queryKey: ["tasks"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllTasks();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useGetCurrentStreak() {
-  const { actor, isFetching } = useActor();
-  return useQuery<bigint>({
-    queryKey: ["streak"],
-    queryFn: async () => {
-      if (!actor) return BigInt(0);
-      return actor.getCurrentStreak();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
 
 const MOTIVATIONAL_QUOTES = [
   "The secret of getting ahead is getting started.",
@@ -65,26 +39,29 @@ export function useGetRandomQuote() {
   });
 }
 
+// Stub hooks — backend methods not yet implemented
+export function useGetAllTasks() {
+  return useQuery<unknown[]>({ queryKey: ["tasks"], queryFn: async () => [] });
+}
+
+export function useGetCurrentStreak() {
+  return useQuery<bigint>({
+    queryKey: ["streak"],
+    queryFn: async () => BigInt(0),
+  });
+}
+
 export function useGetSessionHistory() {
-  const { actor, isFetching } = useActor();
-  return useQuery<Session[]>({
+  return useQuery<unknown[]>({
     queryKey: ["sessions"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getSessionHistory();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: async () => [],
   });
 }
 
 export function useAddTask() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (text: string) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.addTask(text);
-    },
+    mutationFn: async (_text: string) => {},
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
@@ -92,13 +69,9 @@ export function useAddTask() {
 }
 
 export function useToggleTask() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (taskId: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.toggleTaskComplete(taskId);
-    },
+    mutationFn: async (_taskId: bigint) => {},
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
@@ -106,13 +79,9 @@ export function useToggleTask() {
 }
 
 export function useDeleteTask() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (taskId: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.deleteTask(taskId);
-    },
+    mutationFn: async (_taskId: bigint) => {},
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
@@ -120,13 +89,9 @@ export function useDeleteTask() {
 }
 
 export function useCompleteStudySession() {
-  const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (durationMinutes: bigint) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.completeStudySession(durationMinutes);
-    },
+    mutationFn: async (_durationMinutes: bigint) => {},
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["streak"] });
       void queryClient.invalidateQueries({ queryKey: ["sessions"] });
@@ -135,11 +100,9 @@ export function useCompleteStudySession() {
 }
 
 export function useAskQuestion() {
-  const { actor } = useActor();
   return useMutation({
-    mutationFn: async (question: string) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.askQuestion(question);
+    mutationFn: async (_question: string): Promise<string> => {
+      return "Answer not available — backend not connected.";
     },
   });
 }

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
@@ -19,7 +20,6 @@ import {
   useSpring,
 } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetRandomQuote } from "../hooks/useQueries";
 import { useSessionHistory } from "../hooks/useSessionHistory";
 import { LiveClock } from "./LiveClock";

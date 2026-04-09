@@ -1,0 +1,39 @@
+// Version: 1.0.0
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type List__415060402<T> = List__790383201<T>;
+type List__790383201<T> =
+  {
+    var blockIndex : Nat__490723111;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__490723111
+  };
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type Session__107932720 = {date : Int; durationMinutes : Nat};
+type Streak__780601818 = {currentStreak : Nat; lastStudyDay : Int};
+type Task__972485619 =
+  {completed : Bool; createdAt : Int; id : Nat; text : Text};
+actor {
+  stable userSessions :
+    {
+      var root :
+        Node__46230540<Principal, List__415060402<Session__107932720>>;
+      var size : Nat__490723111
+    };
+  stable userStreaks :
+    {
+      var root : Node__46230540<Principal, Streak__780601818>;
+      var size : Nat__490723111
+    };
+  stable userTasks :
+    {
+      var root : Node__46230540<Principal, List__415060402<Task__972485619>>;
+      var size : Nat__490723111
+    }
+};

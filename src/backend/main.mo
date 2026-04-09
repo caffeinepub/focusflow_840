@@ -1,17 +1,13 @@
 import Map "mo:core/Map";
 import List "mo:core/List";
-import Array "mo:core/Array";
 import Time "mo:core/Time";
 import Int "mo:core/Int";
-import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
-import Iter "mo:core/Iter";
 import Principal "mo:core/Principal";
 
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
+
 
 actor {
   type Task = {
@@ -37,45 +33,21 @@ actor {
     durationMinutes : Nat;
   };
 
-  type AIResponse = {
-    keywords : [Text];
-    response : Text;
-  };
-
   // Internal State
-  let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
-
   let userTasks = Map.empty<Principal, List.List<Task>>();
   let userStreaks = Map.empty<Principal, Streak>();
   let userSessions = Map.empty<Principal, List.List<Session>>();
-  let motivationalQuotes = List.empty<Text>();
-  let aiResponses = List.empty<AIResponse>();
 
   func dayFromTimestamp(timestamp : Int) : Int {
     timestamp / (1000 * 60 * 60 * 24);
   };
 
-  // ID Helper Function
   func randomId() : Nat {
     Int.abs(Time.now());
   };
 
-  // MOTIVATIONAL QUOTES
-  public query ({ caller }) func getRandomQuote() : async Text {
-    if (motivationalQuotes.isEmpty()) {
-      Runtime.trap("No motivational quotes available");
-    };
-    let randomIndex = randomId() % motivationalQuotes.size();
-    motivationalQuotes.at(randomIndex);
-  };
-
   // TO-DO LIST
   public shared ({ caller }) func addTask(text : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can add tasks");
-    };
-
     let task : Task = {
       id = randomId();
       text;
@@ -93,10 +65,6 @@ actor {
   };
 
   public shared ({ caller }) func toggleTaskComplete(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can toggle tasks");
-    };
-
     let currentTasks = switch (userTasks.get(caller)) {
       case (null) { Runtime.trap("Task not found") };
       case (?tasks) { tasks };
@@ -116,10 +84,6 @@ actor {
   };
 
   public shared ({ caller }) func deleteTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can delete tasks");
-    };
-
     switch (userTasks.get(caller)) {
       case (null) {
         Runtime.trap("No tasks found for user");
@@ -136,23 +100,14 @@ actor {
   };
 
   public query ({ caller }) func getAllTasks() : async [Task] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view tasks");
-    };
-
     switch (userTasks.get(caller)) {
       case (null) { [] };
-      case (?tasks) { tasks.toVarArray().sort().toArray() };
+      case (?tasks) { tasks.toArray() };
     };
   };
 
   // STREAK COUNTER & SESSION HISTORY
   public shared ({ caller }) func completeStudySession(durationMinutes : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can complete sessions");
-    };
-
-    // Streak Update
     let now = Time.now();
     let today = dayFromTimestamp(now);
 
@@ -174,7 +129,6 @@ actor {
 
     userStreaks.add(caller, currentStreak);
 
-    // Session History
     let session : Session = {
       date = now;
       durationMinutes;
@@ -190,10 +144,6 @@ actor {
   };
 
   public query ({ caller }) func getCurrentStreak() : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view streaks");
-    };
-
     switch (userStreaks.get(caller)) {
       case (null) { 0 };
       case (?streak) { streak.currentStreak };
@@ -201,28 +151,9 @@ actor {
   };
 
   public query ({ caller }) func getSessionHistory() : async [Session] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view session history");
-    };
-
     switch (userSessions.get(caller)) {
       case (null) { [] };
-      case (?sessions) { sessions.toVarArray().toArray() };
+      case (?sessions) { sessions.toArray() };
     };
-  };
-
-  // AI Q&A
-  public query ({ caller }) func askQuestion(question : Text) : async Text {
-    let normalizedQuestion = question.toLower();
-
-    for (aiResponse in aiResponses.values()) {
-      for (keyword in aiResponse.keywords.values()) {
-        if (normalizedQuestion.contains(#text(keyword))) {
-          return aiResponse.response;
-        };
-      };
-    };
-
-    "I'm sorry, I don't have a specific answer for that. Remember to stay focused and keep learning!";
   };
 };

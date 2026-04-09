@@ -35,7 +35,15 @@ function seededPick<T>(arr: T[], seed: number, count: number): T[] {
   return s.slice(0, count);
 }
 
-type GameTab = "chess" | "crossword" | "brain" | "riddles";
+type GameTab =
+  | "chess"
+  | "crossword"
+  | "brain"
+  | "riddles"
+  | "sudoku"
+  | "wordsearch"
+  | "logic"
+  | "typing";
 
 // ─────────────────────────────────────────────
 // Locked Gate
@@ -2069,6 +2077,1221 @@ function RiddlesGame() {
 }
 
 // ─────────────────────────────────────────────
+// SUDOKU
+// ─────────────────────────────────────────────
+// Format: 81-char string, 0=empty. Puzzles hardcoded (3 easy, 3 medium, 3 hard)
+const SUDOKU_PUZZLES: {
+  puzzle: string;
+  solution: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+}[] = [
+  // Easy 1
+  {
+    difficulty: "Easy",
+    puzzle:
+      "530070000600195000098000060800060003400803001700020006060000280000419005000080079",
+    solution:
+      "534678912672195348198342567859761423426853791713924856961537284287419635345286179",
+  },
+  // Easy 2
+  {
+    difficulty: "Easy",
+    puzzle:
+      "200070038000006070300040600008020700100000006007030400004080009060900000910060002",
+    solution:
+      "261579438498316572375248619538921764142687356697435481724853149856194723913762285",
+  },
+  // Easy 3
+  {
+    difficulty: "Easy",
+    puzzle:
+      "000000907000420180000705026100904000050000040000507009920108000034059000507000000",
+    solution:
+      "162348957795426183843751326127964835956213748438597619924138571371865492587642310",
+  },
+  // Medium 1
+  {
+    difficulty: "Medium",
+    puzzle:
+      "010020300004005060070000008006900070000800050090006100000000004050700890008000020",
+    solution:
+      "815427396234895761679013528146932875327861459598146132963578214451729683782354920",
+  },
+  // Medium 2
+  {
+    difficulty: "Medium",
+    puzzle:
+      "700600008003000200060070030000040900040000080009030000050090060002000700400005009",
+    solution:
+      "791623548853914276264578031378241965145796382629835417537492168912367754486155929",
+  },
+  // Medium 3
+  {
+    difficulty: "Medium",
+    puzzle:
+      "008000400300006010040000080200050030000409000060030007080000050030700006001000200",
+    solution:
+      "518293476374856912946721385289547631751469823863132597697318254132974768421685239",
+  },
+  // Hard 1
+  {
+    difficulty: "Hard",
+    puzzle:
+      "800000000003600000070090200060005030000030010400070006000400800050200000010000060",
+    solution:
+      "812753496943682175675491283261845937589237641437169826794316852356924718128578364",
+  },
+  // Hard 2
+  {
+    difficulty: "Hard",
+    puzzle:
+      "000705000300000006040000170080000050700030009010000080026000090600000008000907000",
+    solution:
+      "591785342382914756746623179883461257724538961915276483276849395639152814457397628",
+  },
+  // Hard 3
+  {
+    difficulty: "Hard",
+    puzzle:
+      "000060080800000050070500003060000100000080600001000030000003900350000008040010000",
+    solution:
+      "593762481864193752271548963689427135427981645135654237716235894352679418948316572",
+  },
+];
+
+function SudokuGame() {
+  const seed = getDailySeed();
+  const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">(
+    "Easy",
+  );
+  const filtered = SUDOKU_PUZZLES.filter((p) => p.difficulty === difficulty);
+  const puzzle = seededPick(filtered, seed, 1)[0];
+
+  const [cells, setCells] = useState<string[]>(() => puzzle.puzzle.split(""));
+  const [checked, setChecked] = useState(false);
+  const [solved, setSolved] = useState(false);
+  const [startTime] = useState(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (solved) return;
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - startTime) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [solved, startTime]);
+
+  useEffect(() => {
+    const newCells = seededPick(
+      SUDOKU_PUZZLES.filter((p) => p.difficulty === difficulty),
+      seed,
+      1,
+    )[0].puzzle.split("");
+    setCells(newCells);
+    setChecked(false);
+    setSolved(false);
+  }, [difficulty, seed]);
+
+  const given = puzzle.puzzle.split("").map((c) => c !== "0");
+
+  function setCell(idx: number, val: string) {
+    if (given[idx]) return;
+    const v = val.replace(/[^1-9]/g, "").slice(-1);
+    setCells((prev) => {
+      const n = [...prev];
+      n[idx] = v || "0";
+      return n;
+    });
+    setChecked(false);
+  }
+
+  function check() {
+    setChecked(true);
+    if (cells.join("") === puzzle.solution) setSolved(true);
+  }
+
+  function isWrong(idx: number) {
+    if (!checked) return false;
+    if (given[idx]) return false;
+    return cells[idx] !== "0" && cells[idx] !== puzzle.solution[idx];
+  }
+
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  return (
+    <div className="flex flex-col items-center gap-5 py-4">
+      {/* Controls */}
+      <div className="flex items-center gap-4 flex-wrap justify-center">
+        <div className="flex gap-1">
+          {(["Easy", "Medium", "Hard"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDifficulty(d)}
+              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                background:
+                  difficulty === d
+                    ? "oklch(0.72 0.17 162 / 0.22)"
+                    : "oklch(0.14 0.04 162 / 0.5)",
+                border: `1px solid ${difficulty === d ? "oklch(0.72 0.17 162 / 0.5)" : "oklch(0.72 0.17 162 / 0.1)"}`,
+                color: difficulty === d ? "oklch(0.72 0.17 162)" : "",
+              }}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        <span className="text-sm text-muted-foreground font-mono">
+          ⏱ {fmt(elapsed)}
+        </span>
+      </div>
+
+      {solved && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="px-6 py-3 rounded-2xl text-sm font-bold"
+          style={{
+            background: "oklch(0.72 0.17 162 / 0.15)",
+            border: "1px solid oklch(0.72 0.17 162 / 0.4)",
+            color: "oklch(0.72 0.17 162)",
+          }}
+        >
+          🎉 Solved in {fmt(elapsed)}! Brilliant work!
+        </motion.div>
+      )}
+
+      {/* 9×9 Grid */}
+      <div
+        className="inline-grid"
+        style={{
+          display: "inline-grid",
+          gridTemplateColumns: "repeat(9, 44px)",
+          gap: 0,
+        }}
+      >
+        {cells.map((val, idx) => {
+          const row = Math.floor(idx / 9);
+          const col = idx % 9;
+          const boxRow = Math.floor(row / 3);
+          const boxCol = Math.floor(col / 3);
+          const borderRight =
+            col === 8
+              ? "2px solid oklch(0.72 0.17 162 / 0.5)"
+              : (col + 1) % 3 === 0
+                ? "2px solid oklch(0.72 0.17 162 / 0.4)"
+                : "1px solid oklch(0.40 0.06 162 / 0.3)";
+          const borderBottom =
+            row === 8
+              ? "2px solid oklch(0.72 0.17 162 / 0.5)"
+              : (row + 1) % 3 === 0
+                ? "2px solid oklch(0.72 0.17 162 / 0.4)"
+                : "1px solid oklch(0.40 0.06 162 / 0.3)";
+          const borderLeft =
+            col === 0 ? "2px solid oklch(0.72 0.17 162 / 0.5)" : undefined;
+          const borderTop =
+            row === 0 ? "2px solid oklch(0.72 0.17 162 / 0.5)" : undefined;
+          const bg =
+            (boxRow + boxCol) % 2 === 0
+              ? "oklch(0.13 0.04 162 / 0.6)"
+              : "oklch(0.10 0.03 162 / 0.8)";
+          const wrong = isWrong(idx);
+          const cellId = `r${row}c${col}`;
+          return (
+            <div
+              key={cellId}
+              style={{
+                width: 44,
+                height: 44,
+                borderRight,
+                borderBottom,
+                borderLeft,
+                borderTop,
+                background: wrong ? "oklch(0.65 0.18 25 / 0.2)" : bg,
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background 0.2s",
+              }}
+            >
+              {given[idx] ? (
+                <span
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "oklch(0.90 0.05 162)",
+                    fontFamily: "JetBrains Mono, monospace",
+                  }}
+                >
+                  {val !== "0" ? val : ""}
+                </span>
+              ) : (
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={val !== "0" ? val : ""}
+                  onChange={(e) => setCell(idx, e.target.value)}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    textAlign: "center",
+                    fontSize: 17,
+                    fontWeight: 600,
+                    color: wrong
+                      ? "oklch(0.65 0.18 25)"
+                      : "oklch(0.72 0.17 162)",
+                    fontFamily: "JetBrains Mono, monospace",
+                    cursor: "text",
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <Button size="sm" onClick={check} disabled={solved} className="px-8">
+        ✓ Check Solution
+      </Button>
+      <p className="text-xs text-muted-foreground/50 italic">
+        🌙 New puzzle tomorrow!
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// WORD SEARCH
+// ─────────────────────────────────────────────
+interface WordTheme {
+  name: string;
+  words: string[];
+}
+
+const WORD_THEMES: WordTheme[] = [
+  {
+    name: "Science ⚗️",
+    words: ["ATOM", "CELL", "GENE", "WAVE", "MASS", "FORCE", "LIGHT", "HEAT"],
+  },
+  {
+    name: "Space 🚀",
+    words: ["STAR", "MOON", "MARS", "NOVA", "RING", "VOID", "ORBIT", "COMET"],
+  },
+  {
+    name: "Math 🔢",
+    words: ["SINE", "MEAN", "ROOT", "AXIS", "AREA", "RATIO", "PRIME", "CURVE"],
+  },
+  {
+    name: "Nature 🌿",
+    words: ["BARK", "FERN", "REEF", "MIST", "DUNE", "CAVE", "DELTA", "GROVE"],
+  },
+  {
+    name: "Tech 💻",
+    words: ["CODE", "DATA", "NODE", "BYTE", "LOOP", "HASH", "ARRAY", "STACK"],
+  },
+];
+
+function buildWordSearch(
+  words: string[],
+  seed: number,
+): {
+  grid: string[][];
+  placements: { word: string; cells: [number, number][] }[];
+} {
+  const SIZE = 10;
+  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const grid: string[][] = Array(SIZE)
+    .fill(null)
+    .map(() => Array(SIZE).fill(""));
+  const placements: { word: string; cells: [number, number][] }[] = [];
+  let r = seed;
+  const rand = () => {
+    r = (r * 1664525 + 1013904223) & 0x7fffffff;
+    return r;
+  };
+
+  for (const word of words) {
+    let placed = false;
+    for (let attempt = 0; attempt < 100 && !placed; attempt++) {
+      const horiz = rand() % 2 === 0;
+      const maxR = horiz ? SIZE : SIZE - word.length;
+      const maxC = horiz ? SIZE - word.length : SIZE;
+      const sr = rand() % (maxR + 1);
+      const sc = rand() % (maxC + 1);
+      const cells: [number, number][] = word
+        .split("")
+        .map((_, i) => [sr + (horiz ? 0 : i), sc + (horiz ? i : 0)]);
+      const ok = cells.every(
+        ([cr, cc]) =>
+          grid[cr][cc] === "" ||
+          grid[cr][cc] === word[cells.indexOf([cr, cc] as [number, number])],
+      );
+      if (ok) {
+        cells.forEach(([cr, cc], i) => {
+          grid[cr][cc] = word[i];
+        });
+        placements.push({ word, cells });
+        placed = true;
+      }
+    }
+  }
+  // Fill remaining with random letters
+  for (let row = 0; row < SIZE; row++)
+    for (let col = 0; col < SIZE; col++)
+      if (grid[row][col] === "") grid[row][col] = ALPHABET[rand() % 26];
+  return { grid, placements };
+}
+
+function WordSearchGame() {
+  const seed = getDailySeed();
+  const theme = seededPick(WORD_THEMES, seed, 1)[0];
+  const { grid, placements } = buildWordSearch(theme.words, seed);
+  const [found, setFound] = useState<Set<string>>(new Set());
+  const [selecting, setSelecting] = useState<[number, number] | null>(null);
+  const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
+  const [allFound, setAllFound] = useState(false);
+
+  function cellKey(r: number, c: number) {
+    return `${r},${c}`;
+  }
+  function getFoundCells() {
+    const s = new Set<string>();
+    for (const p of placements.filter((pr) => found.has(pr.word))) {
+      for (const [r, c] of p.cells) s.add(cellKey(r, c));
+    }
+    return s;
+  }
+  const foundCells = getFoundCells();
+
+  function handleCellClick(row: number, col: number) {
+    if (!selecting) {
+      setSelecting([row, col]);
+      setHighlighted(new Set([cellKey(row, col)]));
+    } else {
+      const [sr, sc] = selecting;
+      // Try horizontal
+      const cells: [number, number][] = [];
+      if (sr === row) {
+        const [minC, maxC] = [Math.min(sc, col), Math.max(sc, col)];
+        for (let c = minC; c <= maxC; c++) cells.push([row, c]);
+      } else if (sc === col) {
+        const [minR, maxR] = [Math.min(sr, row), Math.max(sr, row)];
+        for (let r = minR; r <= maxR; r++) cells.push([r, col]);
+      }
+      if (cells.length > 0) {
+        const word = cells.map(([r, c]) => grid[r][c]).join("");
+        const wordRev = word.split("").reverse().join("");
+        const match = placements.find(
+          (p) => (p.word === word || p.word === wordRev) && !found.has(p.word),
+        );
+        if (match) {
+          const newFound = new Set(found).add(match.word);
+          setFound(newFound);
+          if (newFound.size === theme.words.length) setAllFound(true);
+        }
+      }
+      setSelecting(null);
+      setHighlighted(new Set());
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 py-4">
+      <div
+        className="text-sm font-medium px-4 py-1.5 rounded-xl"
+        style={{
+          background: "oklch(0.72 0.17 162 / 0.10)",
+          border: "1px solid oklch(0.72 0.17 162 / 0.2)",
+          color: "oklch(0.72 0.17 162)",
+        }}
+      >
+        Today&apos;s Theme: {theme.name}
+      </div>
+
+      {allFound && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="px-6 py-3 rounded-2xl text-sm font-bold"
+          style={{
+            background: "oklch(0.72 0.17 162 / 0.15)",
+            border: "1px solid oklch(0.72 0.17 162 / 0.4)",
+            color: "oklch(0.72 0.17 162)",
+          }}
+        >
+          🎉 All words found! You&apos;re a word wizard!
+        </motion.div>
+      )}
+
+      {/* Grid */}
+      <div
+        className="inline-grid select-none"
+        style={{
+          display: "inline-grid",
+          gridTemplateColumns: "repeat(10, 38px)",
+          gap: 2,
+        }}
+      >
+        {grid.map((rowArr, r) =>
+          rowArr.map((letter, c) => {
+            const key = cellKey(r, c);
+            const isFound = foundCells.has(key);
+            const isSel = selecting && selecting[0] === r && selecting[1] === c;
+            const isHl = highlighted.has(key);
+            return (
+              <motion.button
+                key={key}
+                type="button"
+                whileTap={{ scale: 0.88 }}
+                onClick={() => handleCellClick(r, c)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 7,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  fontFamily: "JetBrains Mono, monospace",
+                  background: isFound
+                    ? "oklch(0.55 0.17 162 / 0.35)"
+                    : isSel
+                      ? "oklch(0.72 0.16 75 / 0.35)"
+                      : isHl
+                        ? "oklch(0.72 0.17 162 / 0.20)"
+                        : "oklch(0.14 0.04 162 / 0.6)",
+                  border: `1px solid ${isFound ? "oklch(0.72 0.17 162 / 0.45)" : isSel ? "oklch(0.72 0.16 75 / 0.5)" : "oklch(0.35 0.06 162 / 0.4)"}`,
+                  color: isFound
+                    ? "oklch(0.85 0.14 162)"
+                    : "oklch(0.85 0.03 162)",
+                  transition: "background 0.15s, border 0.15s",
+                  cursor: "pointer",
+                }}
+              >
+                {letter}
+              </motion.button>
+            );
+          }),
+        )}
+      </div>
+
+      {/* Word list */}
+      <div className="flex flex-wrap gap-2 justify-center max-w-sm">
+        {theme.words.map((word) => (
+          <span
+            key={word}
+            className="px-3 py-1 rounded-lg text-xs font-bold transition-all"
+            style={{
+              background: found.has(word)
+                ? "oklch(0.72 0.17 162 / 0.20)"
+                : "oklch(0.14 0.04 162 / 0.5)",
+              border: `1px solid ${found.has(word) ? "oklch(0.72 0.17 162 / 0.4)" : "oklch(0.35 0.06 162 / 0.3)"}`,
+              color: found.has(word)
+                ? "oklch(0.72 0.17 162)"
+                : "oklch(0.55 0.05 162)",
+              textDecoration: found.has(word) ? "line-through" : "none",
+            }}
+          >
+            {word}
+          </span>
+        ))}
+      </div>
+      {selecting && (
+        <p className="text-xs text-muted-foreground/60">
+          Click the last letter of the word to complete selection
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground/50 italic">
+        🌙 New words tomorrow!
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// LOGIC SEQUENCE
+// ─────────────────────────────────────────────
+interface SequencePuzzle {
+  question: string;
+  options: number[];
+  answer: number;
+  explanation: string;
+}
+
+const ALL_SEQUENCES: SequencePuzzle[] = [
+  {
+    question: "2, 4, 6, 8, _?",
+    options: [9, 10, 11, 12],
+    answer: 10,
+    explanation: "+2 each step",
+  },
+  {
+    question: "3, 6, 12, 24, _?",
+    options: [36, 48, 50, 42],
+    answer: 48,
+    explanation: "×2 each step",
+  },
+  {
+    question: "1, 4, 9, 16, _?",
+    options: [20, 25, 36, 22],
+    answer: 25,
+    explanation: "Perfect squares: 1², 2², 3², 4², 5²",
+  },
+  {
+    question: "100, 90, 81, 73, _?",
+    options: [64, 66, 68, 70],
+    answer: 66,
+    explanation: "-10, -9, -8, -7...",
+  },
+  {
+    question: "1, 1, 2, 3, 5, 8, _?",
+    options: [11, 13, 15, 16],
+    answer: 13,
+    explanation: "Fibonacci: each = sum of previous two",
+  },
+  {
+    question: "5, 10, 20, 40, _?",
+    options: [60, 70, 80, 90],
+    answer: 80,
+    explanation: "×2 each step",
+  },
+  {
+    question: "3, 9, 27, 81, _?",
+    options: [162, 243, 270, 324],
+    answer: 243,
+    explanation: "×3 each step (powers of 3)",
+  },
+  {
+    question: "2, 5, 10, 17, 26, _?",
+    options: [35, 36, 37, 38],
+    answer: 37,
+    explanation: "+3, +5, +7, +9, +11 (odd increments)",
+  },
+  {
+    question: "64, 32, 16, 8, _?",
+    options: [2, 3, 4, 6],
+    answer: 4,
+    explanation: "÷2 each step",
+  },
+  {
+    question: "1, 8, 27, 64, _?",
+    options: [100, 115, 125, 144],
+    answer: 125,
+    explanation: "Perfect cubes: 1³, 2³, 3³, 4³, 5³",
+  },
+  {
+    question: "7, 14, 21, 28, _?",
+    options: [32, 35, 38, 42],
+    answer: 35,
+    explanation: "+7 each step (multiples of 7)",
+  },
+  {
+    question: "2, 6, 18, 54, _?",
+    options: [108, 162, 180, 216],
+    answer: 162,
+    explanation: "×3 each step",
+  },
+  {
+    question: "1, 2, 4, 7, 11, _?",
+    options: [14, 16, 18, 20],
+    answer: 16,
+    explanation: "+1, +2, +3, +4, +5 (incrementing diff)",
+  },
+  {
+    question: "50, 47, 44, 41, _?",
+    options: [36, 37, 38, 39],
+    answer: 38,
+    explanation: "-3 each step",
+  },
+  {
+    question: "1, 3, 7, 15, 31, _?",
+    options: [55, 63, 62, 61],
+    answer: 63,
+    explanation: "×2+1 each step",
+  },
+  {
+    question: "4, 9, 16, 25, 36, _?",
+    options: [42, 47, 49, 52],
+    answer: 49,
+    explanation: "Consecutive squares: 2², 3², 4², 5², 6², 7²",
+  },
+  {
+    question: "10, 8, 6, 4, _?",
+    options: [1, 2, 3, 0],
+    answer: 2,
+    explanation: "-2 each step",
+  },
+  {
+    question: "1, 5, 14, 30, 55, _?",
+    options: [84, 91, 100, 110],
+    answer: 91,
+    explanation: "Triangular pyramidal numbers",
+  },
+  {
+    question: "2, 3, 5, 7, 11, _?",
+    options: [12, 13, 14, 15],
+    answer: 13,
+    explanation: "Prime numbers sequence",
+  },
+  {
+    question: "0, 1, 3, 6, 10, _?",
+    options: [13, 14, 15, 16],
+    answer: 15,
+    explanation: "Triangular numbers: +1, +2, +3...",
+  },
+  {
+    question: "256, 128, 64, 32, _?",
+    options: [8, 12, 16, 24],
+    answer: 16,
+    explanation: "÷2 each step (powers of 2)",
+  },
+  {
+    question: "3, 5, 9, 15, 23, _?",
+    options: [28, 31, 33, 35],
+    answer: 33,
+    explanation: "+2, +4, +6, +8, +10 (even increments)",
+  },
+  {
+    question: "1, 4, 13, 40, _?",
+    options: [100, 115, 121, 132],
+    answer: 121,
+    explanation: "×3+1 each step",
+  },
+  {
+    question: "11, 22, 33, 44, _?",
+    options: [50, 55, 60, 66],
+    answer: 55,
+    explanation: "+11 each step (multiples of 11)",
+  },
+  {
+    question: "729, 243, 81, 27, _?",
+    options: [3, 6, 9, 12],
+    answer: 9,
+    explanation: "÷3 each step (powers of 3)",
+  },
+  {
+    question: "2, 4, 8, 16, 32, _?",
+    options: [48, 56, 64, 72],
+    answer: 64,
+    explanation: "×2 each step (powers of 2)",
+  },
+  {
+    question: "5, 11, 23, 47, _?",
+    options: [85, 93, 95, 97],
+    answer: 95,
+    explanation: "×2+1 each step",
+  },
+  {
+    question: "1, 2, 6, 24, 120, _?",
+    options: [360, 480, 720, 840],
+    answer: 720,
+    explanation: "Factorial sequence: ×2, ×3, ×4, ×5, ×6",
+  },
+  {
+    question: "4, 7, 12, 19, 28, _?",
+    options: [37, 38, 39, 40],
+    answer: 39,
+    explanation: "+3, +5, +7, +9, +11 (odd increments)",
+  },
+  {
+    question: "81, 27, 9, 3, _?",
+    options: [0, 1, 2, 3],
+    answer: 1,
+    explanation: "÷3 each step",
+  },
+];
+const DAILY_SEQUENCES = seededPick(ALL_SEQUENCES, getDailySeed() + 1, 10);
+
+function LogicSequenceGame() {
+  const [idx, setIdx] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(20);
+  const [done, setDone] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (done || showExplanation) return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(timerRef.current!);
+          setShowExplanation(true);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, showExplanation]);
+
+  function pickAnswer(optIdx: number) {
+    if (selected !== null || showExplanation) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    setSelected(optIdx);
+    const puzzle = DAILY_SEQUENCES[idx];
+    if (puzzle.options[optIdx] === puzzle.answer) setScore((s) => s + 1);
+    setShowExplanation(true);
+  }
+
+  function nextQ() {
+    if (idx + 1 >= DAILY_SEQUENCES.length) {
+      setDone(true);
+      return;
+    }
+    setIdx((i) => i + 1);
+    setSelected(null);
+    setShowExplanation(false);
+    setTimeLeft(20);
+  }
+
+  function restart() {
+    setIdx(0);
+    setSelected(null);
+    setShowExplanation(false);
+    setScore(0);
+    setTimeLeft(20);
+    setDone(false);
+  }
+
+  if (done) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center py-8 flex flex-col items-center gap-4"
+      >
+        <div className="text-5xl">🧩</div>
+        <h3 className="text-2xl font-bold">Logic Master!</h3>
+        <p className="text-muted-foreground">
+          Score:{" "}
+          <span className="font-bold text-foreground">
+            {score}/{DAILY_SEQUENCES.length}
+          </span>
+        </p>
+        <div
+          className="px-4 py-2 rounded-xl text-sm"
+          style={{
+            background:
+              score >= 8
+                ? "oklch(0.72 0.17 162 / 0.12)"
+                : "oklch(0.72 0.16 75 / 0.10)",
+            border: `1px solid ${score >= 8 ? "oklch(0.72 0.17 162 / 0.3)" : "oklch(0.72 0.16 75 / 0.3)"}`,
+            color: score >= 8 ? "oklch(0.72 0.17 162)" : "oklch(0.72 0.16 75)",
+          }}
+        >
+          {score >= 9
+            ? "🌟 Perfect logical mind!"
+            : score >= 7
+              ? "🎯 Sharp pattern recognition!"
+              : score >= 5
+                ? "📚 Good effort! Keep sharpening."
+                : "💪 Practice makes perfect!"}
+        </div>
+        <Button onClick={restart}>Try Again</Button>
+      </motion.div>
+    );
+  }
+
+  const puzzle = DAILY_SEQUENCES[idx];
+  return (
+    <div className="flex flex-col items-center gap-5 py-4 max-w-md mx-auto">
+      {/* Progress */}
+      <div className="w-full">
+        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+          <span>
+            Q {idx + 1} / {DAILY_SEQUENCES.length}
+          </span>
+          <span style={{ color: timeLeft <= 5 ? "oklch(0.65 0.18 25)" : "" }}>
+            ⏱ {timeLeft}s
+          </span>
+        </div>
+        <div
+          className="h-1.5 rounded-full overflow-hidden"
+          style={{ background: "oklch(0.15 0.04 162 / 0.5)" }}
+        >
+          <motion.div
+            className="h-full rounded-full"
+            animate={{ width: `${(timeLeft / 20) * 100}%` }}
+            transition={{ duration: 0.5 }}
+            style={{
+              background:
+                timeLeft > 8 ? "oklch(0.72 0.17 162)" : "oklch(0.65 0.18 25)",
+              boxShadow: `0 0 8px ${timeLeft > 8 ? "oklch(0.72 0.17 162 / 0.5)" : "oklch(0.65 0.18 25 / 0.5)"}`,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Question */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={idx}
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -30 }}
+          className="w-full text-center"
+        >
+          <div
+            className="text-2xl font-bold py-6 px-6 rounded-2xl"
+            style={{
+              background: "oklch(0.12 0.04 162 / 0.6)",
+              border: "1px solid oklch(0.72 0.17 162 / 0.2)",
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+          >
+            {puzzle.question}
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Options */}
+      <div className="grid grid-cols-2 gap-3 w-full">
+        {puzzle.options.map((opt, i) => {
+          const isCorrect = opt === puzzle.answer;
+          const isPicked = selected === i;
+          const reveal = showExplanation;
+          return (
+            <motion.button
+              key={`opt-${opt}`}
+              type="button"
+              whileHover={!showExplanation ? { scale: 1.03 } : {}}
+              whileTap={!showExplanation ? { scale: 0.97 } : {}}
+              onClick={() => pickAnswer(i)}
+              className="py-4 rounded-xl text-lg font-bold transition-all"
+              style={{
+                background: reveal
+                  ? isCorrect
+                    ? "oklch(0.72 0.17 162 / 0.22)"
+                    : isPicked
+                      ? "oklch(0.65 0.18 25 / 0.20)"
+                      : "oklch(0.12 0.04 162 / 0.5)"
+                  : "oklch(0.14 0.04 162 / 0.6)",
+                border: reveal
+                  ? `2px solid ${isCorrect ? "oklch(0.72 0.17 162 / 0.6)" : isPicked ? "oklch(0.65 0.18 25 / 0.5)" : "oklch(0.35 0.05 162 / 0.3)"}`
+                  : "1px solid oklch(0.35 0.06 162 / 0.4)",
+                color: reveal
+                  ? isCorrect
+                    ? "oklch(0.85 0.14 162)"
+                    : isPicked
+                      ? "oklch(0.75 0.16 25)"
+                      : ""
+                  : "",
+                cursor: showExplanation ? "default" : "pointer",
+              }}
+            >
+              {opt}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Explanation */}
+      <AnimatePresence>
+        {showExplanation && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="w-full rounded-xl px-4 py-3 text-sm"
+            style={{
+              background: "oklch(0.72 0.16 75 / 0.08)",
+              border: "1px solid oklch(0.72 0.16 75 / 0.25)",
+              color: "oklch(0.78 0.16 75)",
+            }}
+          >
+            💡 {puzzle.explanation} → Answer: <strong>{puzzle.answer}</strong>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {showExplanation && (
+        <Button onClick={nextQ} className="px-8">
+          {idx + 1 >= DAILY_SEQUENCES.length ? "See Results" : "Next →"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// SPEED TYPING
+// ─────────────────────────────────────────────
+const TYPING_QUOTES = [
+  "The secret of getting ahead is getting started. Take the first step now.",
+  "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+  "Believe you can and you are halfway there. Keep pushing forward.",
+  "Hard work beats talent when talent does not work hard. Stay consistent.",
+  "The only way to do great work is to love what you do. Find your passion.",
+  "Education is the most powerful weapon which you can use to change the world.",
+  "Study not to be a great student, but to become a great thinker and creator.",
+  "Don't watch the clock. Do what it does. Keep going until the job is done.",
+  "Perseverance is not a long race. It is many short races one after the other.",
+  "The expert in anything was once a beginner. Embrace the learning process.",
+  "A mind is like a parachute. It only works when it is completely open.",
+  "Knowledge is power. Information is liberating. Education is the premise of progress.",
+  "The beautiful thing about learning is that no one can take it away from you.",
+  "Your brain is like a muscle. The more you use it, the stronger it gets.",
+  "Genius is one percent inspiration and ninety-nine percent perspiration.",
+  "It always seems impossible until it is done. Break your goals into steps.",
+  "The roots of education are bitter, but the fruit is sweet. Keep learning.",
+  "You do not rise to the level of your goals. You fall to the level of your systems.",
+  "Focus on progress, not perfection. Every small step forward counts.",
+  "Dream big, work hard, stay focused, and surround yourself with good people.",
+];
+const DAILY_TYPING_QUOTE = seededPick(TYPING_QUOTES, getDailySeed() + 2, 1)[0];
+
+function SpeedTypingGame() {
+  const [phase, setPhase] = useState<"idle" | "typing" | "done">("idle");
+  const [typed, setTyped] = useState("");
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [wpm, setWpm] = useState(0);
+  const [accuracy, setAccuracy] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typedRef = useRef(typed);
+  const target = DAILY_TYPING_QUOTE;
+
+  useEffect(() => {
+    typedRef.current = typed;
+  }, [typed]);
+
+  const storeResults = useCallback(
+    (currentTyped: string, tLeft: number) => {
+      const words = currentTyped.trim().split(/\s+/).filter(Boolean).length;
+      const minutesUsed = (60 - tLeft) / 60 || 1 / 60;
+      setWpm(Math.round(words / minutesUsed));
+      const correctChars = currentTyped
+        .split("")
+        .filter((ch, i) => ch === target[i]).length;
+      setAccuracy(
+        currentTyped.length > 0
+          ? Math.round((correctChars / currentTyped.length) * 100)
+          : 0,
+      );
+    },
+    [target],
+  );
+
+  useEffect(() => {
+    if (phase !== "typing") return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          storeResults(typedRef.current, 0);
+          setPhase("done");
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, storeResults]);
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    if (phase === "idle") setPhase("typing");
+    const val = e.target.value;
+    if (val.length > target.length) return;
+    setTyped(val);
+    if (val === target) {
+      storeResults(val, timeLeft);
+      setPhase("done");
+    }
+  }
+
+  function restart() {
+    setTyped("");
+    setPhase("idle");
+    setTimeLeft(60);
+    setWpm(0);
+    setAccuracy(0);
+  }
+
+  function badge() {
+    if (wpm >= 80)
+      return { label: "⚡ Speed Demon", color: "oklch(0.78 0.16 75)" };
+    if (wpm >= 55)
+      return { label: "🚀 Fast Typist", color: "oklch(0.72 0.17 162)" };
+    if (wpm >= 35)
+      return { label: "📚 Steady Writer", color: "oklch(0.65 0.15 230)" };
+    return { label: "🐢 Keep Practicing", color: "oklch(0.55 0.10 162)" };
+  }
+
+  // Character comparison overlay
+  const chars = target.split("").map((ch, i) => {
+    const typedChar = typed[i];
+    if (typedChar === undefined) return { ch, state: "pending" as const };
+    if (typedChar === ch) return { ch, state: "correct" as const };
+    return { ch, state: "wrong" as const };
+  });
+
+  if (phase === "done") {
+    const b = badge();
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center gap-5 py-6"
+      >
+        <div className="text-5xl">⌨️</div>
+        <h3 className="text-2xl font-bold">Results</h3>
+        <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+          {[
+            { label: "WPM", value: wpm, color: "oklch(0.72 0.17 162)" },
+            {
+              label: "Accuracy",
+              value: `${accuracy}%`,
+              color: "oklch(0.78 0.16 75)",
+            },
+          ].map(({ label, value, color }) => (
+            <div
+              key={label}
+              className="rounded-2xl p-5 text-center"
+              style={{
+                background: "oklch(0.12 0.04 162 / 0.6)",
+                border: "1px solid oklch(0.72 0.17 162 / 0.2)",
+              }}
+            >
+              <div className="text-3xl font-black" style={{ color }}>
+                {value}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">{label}</div>
+            </div>
+          ))}
+        </div>
+        <div
+          className="px-5 py-2.5 rounded-2xl text-sm font-bold"
+          style={{
+            background: "oklch(0.14 0.04 162 / 0.7)",
+            border: `1px solid ${b.color}`,
+            color: b.color,
+          }}
+        >
+          {b.label}
+        </div>
+        <Button onClick={restart}>Try Again</Button>
+      </motion.div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5 py-4 max-w-2xl mx-auto">
+      {/* Timer bar */}
+      <div className="flex items-center gap-3">
+        <div
+          className="flex-1 h-2 rounded-full overflow-hidden"
+          style={{ background: "oklch(0.15 0.04 162 / 0.5)" }}
+        >
+          <motion.div
+            className="h-full rounded-full"
+            animate={{ width: `${(timeLeft / 60) * 100}%` }}
+            transition={{ duration: 0.5 }}
+            style={{
+              background:
+                timeLeft > 15 ? "oklch(0.72 0.17 162)" : "oklch(0.65 0.18 25)",
+              boxShadow: `0 0 8px ${timeLeft > 15 ? "oklch(0.72 0.17 162 / 0.5)" : "oklch(0.65 0.18 25 / 0.5)"}`,
+            }}
+          />
+        </div>
+        <span
+          className="text-sm font-mono font-bold w-10 text-right"
+          style={{ color: timeLeft <= 10 ? "oklch(0.65 0.18 25)" : "" }}
+        >
+          {timeLeft}s
+        </span>
+      </div>
+
+      {/* Target text with color overlay */}
+      <div
+        className="rounded-2xl p-5 text-base leading-relaxed font-mono relative"
+        style={{
+          background: "oklch(0.11 0.03 162 / 0.8)",
+          border: "1px solid oklch(0.72 0.17 162 / 0.15)",
+          minHeight: 100,
+        }}
+      >
+        {chars.map((c, i) => {
+          const pos = i.toString(36).padStart(3, "0");
+          return (
+            <span
+              key={`p${pos}`}
+              style={{
+                color:
+                  c.state === "correct"
+                    ? "oklch(0.72 0.17 162)"
+                    : c.state === "wrong"
+                      ? "oklch(0.65 0.18 25)"
+                      : "oklch(0.55 0.05 162)",
+                background:
+                  c.state === "wrong"
+                    ? "oklch(0.65 0.18 25 / 0.12)"
+                    : "transparent",
+              }}
+            >
+              {c.ch}
+            </span>
+          );
+        })}
+        {phase === "idle" && (
+          <div
+            className="absolute inset-0 flex items-center justify-center rounded-2xl text-sm text-muted-foreground/60"
+            style={{ background: "oklch(0.11 0.03 162 / 0.3)" }}
+          >
+            Start typing below ↓
+          </div>
+        )}
+      </div>
+
+      {/* Textarea */}
+      <textarea
+        ref={textareaRef}
+        value={typed}
+        onChange={handleChange}
+        onPaste={(e) => e.preventDefault()}
+        rows={3}
+        placeholder={phase === "idle" ? "Start typing the quote above..." : ""}
+        className="w-full rounded-xl p-4 text-base font-mono resize-none outline-none transition-all"
+        style={{
+          background: "oklch(0.14 0.04 162 / 0.7)",
+          border: "1.5px solid oklch(0.72 0.17 162 / 0.25)",
+          color: "inherit",
+          caretColor: "oklch(0.72 0.17 162)",
+        }}
+      />
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          {typed.length} / {target.length} chars
+        </span>
+        {phase === "typing" && (
+          <span>
+            {Math.round(
+              typed.trim().split(/\s+/).filter(Boolean).length /
+                ((60 - timeLeft + 1) / 60),
+            )}{" "}
+            WPM live
+          </span>
+        )}
+        <span>No paste allowed</span>
+      </div>
+      <p className="text-xs text-muted-foreground/50 italic text-center">
+        🌙 New quote tomorrow!
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // MAIN GAMES SECTION
 // ─────────────────────────────────────────────
 export function GamesSection() {
@@ -2104,6 +3327,10 @@ export function GamesSection() {
     { id: "crossword", label: "Crossword", emoji: "📝" },
     { id: "brain", label: "Brain Games", emoji: "🧠" },
     { id: "riddles", label: "Riddles", emoji: "🔮" },
+    { id: "sudoku", label: "Sudoku", emoji: "🔢" },
+    { id: "wordsearch", label: "Words", emoji: "🔍" },
+    { id: "logic", label: "Logic", emoji: "🧩" },
+    { id: "typing", label: "Typing", emoji: "⌨️" },
   ];
 
   return (
@@ -2267,14 +3494,14 @@ export function GamesSection() {
         </div>
 
         {/* Game tabs */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1 flex-nowrap">
           {GAME_TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               data-ocid={`games.${tab.id}.tab`}
               onClick={() => setActiveGame(tab.id)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex-shrink-0"
               style={{
                 background:
                   activeGame === tab.id
@@ -2322,6 +3549,10 @@ export function GamesSection() {
               {activeGame === "crossword" && <CrosswordGame />}
               {activeGame === "brain" && <BrainGames />}
               {activeGame === "riddles" && <RiddlesGame />}
+              {activeGame === "sudoku" && <SudokuGame />}
+              {activeGame === "wordsearch" && <WordSearchGame />}
+              {activeGame === "logic" && <LogicSequenceGame />}
+              {activeGame === "typing" && <SpeedTypingGame />}
             </motion.div>
           </AnimatePresence>
         </div>

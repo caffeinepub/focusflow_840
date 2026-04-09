@@ -17,22 +17,13 @@ export interface Task {
   'text' : string,
   'completed' : boolean,
 }
-export type UserRole = { 'admin' : null } |
-  { 'user' : null } |
-  { 'guest' : null };
 export interface _SERVICE {
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addTask' : ActorMethod<[string], undefined>,
-  'askQuestion' : ActorMethod<[string], string>,
-  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'completeStudySession' : ActorMethod<[bigint], undefined>,
   'deleteTask' : ActorMethod<[bigint], undefined>,
   'getAllTasks' : ActorMethod<[], Array<Task>>,
-  'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCurrentStreak' : ActorMethod<[], bigint>,
-  'getRandomQuote' : ActorMethod<[], string>,
   'getSessionHistory' : ActorMethod<[], Array<Session>>,
-  'isCallerAdmin' : ActorMethod<[], boolean>,
   'toggleTaskComplete' : ActorMethod<[bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

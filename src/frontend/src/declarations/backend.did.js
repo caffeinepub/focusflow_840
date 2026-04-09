@@ -8,11 +8,6 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const UserRole = IDL.Variant({
-  'admin' : IDL.Null,
-  'user' : IDL.Null,
-  'guest' : IDL.Null,
-});
 export const Task = IDL.Record({
   'id' : IDL.Nat,
   'createdAt' : IDL.Int,
@@ -25,29 +20,18 @@ export const Session = IDL.Record({
 });
 
 export const idlService = IDL.Service({
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addTask' : IDL.Func([IDL.Text], [], []),
-  'askQuestion' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
-  'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'completeStudySession' : IDL.Func([IDL.Nat], [], []),
   'deleteTask' : IDL.Func([IDL.Nat], [], []),
   'getAllTasks' : IDL.Func([], [IDL.Vec(Task)], ['query']),
-  'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCurrentStreak' : IDL.Func([], [IDL.Nat], ['query']),
-  'getRandomQuote' : IDL.Func([], [IDL.Text], ['query']),
   'getSessionHistory' : IDL.Func([], [IDL.Vec(Session)], ['query']),
-  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'toggleTaskComplete' : IDL.Func([IDL.Nat], [], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'user' : IDL.Null,
-    'guest' : IDL.Null,
-  });
   const Task = IDL.Record({
     'id' : IDL.Nat,
     'createdAt' : IDL.Int,
@@ -57,18 +41,12 @@ export const idlFactory = ({ IDL }) => {
   const Session = IDL.Record({ 'date' : IDL.Int, 'durationMinutes' : IDL.Nat });
   
   return IDL.Service({
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addTask' : IDL.Func([IDL.Text], [], []),
-    'askQuestion' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
-    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'completeStudySession' : IDL.Func([IDL.Nat], [], []),
     'deleteTask' : IDL.Func([IDL.Nat], [], []),
     'getAllTasks' : IDL.Func([], [IDL.Vec(Task)], ['query']),
-    'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCurrentStreak' : IDL.Func([], [IDL.Nat], ['query']),
-    'getRandomQuote' : IDL.Func([], [IDL.Text], ['query']),
     'getSessionHistory' : IDL.Func([], [IDL.Vec(Session)], ['query']),
-    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'toggleTaskComplete' : IDL.Func([IDL.Nat], [], []),
   });
 };

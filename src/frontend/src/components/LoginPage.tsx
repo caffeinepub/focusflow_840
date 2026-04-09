@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { BookOpen, Brain, Flame, Music, Timer, Zap } from "lucide-react";
 import { motion } from "motion/react";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 export function LoginPage() {
   const { login, isLoggingIn } = useInternetIdentity();

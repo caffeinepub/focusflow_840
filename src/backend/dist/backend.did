@@ -1,0 +1,21 @@
+type Task = 
+ record {
+   completed: bool;
+   createdAt: int;
+   id: nat;
+   "text": text;
+ };
+type Session = 
+ record {
+   date: int;
+   durationMinutes: nat;
+ };
+service : {
+  addTask: ("text": text) -> ();
+  completeStudySession: (durationMinutes: nat) -> ();
+  deleteTask: (taskId: nat) -> ();
+  getAllTasks: () -> (vec Task) query;
+  getCurrentStreak: () -> (nat) query;
+  getSessionHistory: () -> (vec Session) query;
+  toggleTaskComplete: (taskId: nat) -> ();
+}
